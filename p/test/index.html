@@ -11,7 +11,7 @@ type Coordinator struct { files []string nMap int nReduce int mapidCh chan int r
 
 <link rel='canonical' href='https://cza2000.github.io/p/test/'>
 
-<link rel="stylesheet" href="/scss/style.min.6cc737929a52bf144c575707351e1341621f72acb2e80d2c8e84a96c0ea483e9.css"><meta property='og:title' content='Test'>
+<link rel="stylesheet" href="/scss/style.min.168c117a0decd446482bf07d0106a16fde6d69c29ea758b67d14d5a1736de0f8.css"><meta property='og:title' content='Test'>
 <meta property='og:description' content='Lab1: MapReduce  Coordinator  核心结构体 RPC handler 核心逻辑   Worker  在本次lab中我们的任务是实现一个分布式的MapReduce，它由两个程序组成，Coordinator和Worker。只有一个Coordinator，一个或多个Worker并行执行。
 每个Worker将通过RPC与Coordinator通信以请求一个Map或Reduce任务，之后从一个或多个文件中读取任务的输入，执行任务，并将任务的输出写入一个或多个文件。
 Coordinator应注意到Worker是否在合理的时间内（10s）完成了任务，如果没有则将相同的任务交给另一个Worker。
