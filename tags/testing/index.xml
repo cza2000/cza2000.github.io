@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Testing on Ziann Chen&#39;s blog</title>
+    <link>https://cza2000.github.io/tags/testing/</link>
+    <description>Recent content in Testing on Ziann Chen&#39;s blog</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>zh-CN</language>
+    <lastBuildDate>Mon, 31 Jan 2022 14:38:17 +0800</lastBuildDate><atom:link href="https://cza2000.github.io/tags/testing/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>My First Post</title>
+      <link>https://cza2000.github.io/p/my-first-post/</link>
+      <pubDate>Mon, 31 Jan 2022 14:38:17 +0800</pubDate>
+      
+      <guid>https://cza2000.github.io/p/my-first-post/</guid>
+      <description>hello world1 777
+hello world2 777
+Hello Hugo3  aaa bbb ccc  func main() { fmt.Printf(&amp;#34;Hello world&amp;#34;) } </description>
+    </item>
+    
+  </channel>
+</rss>

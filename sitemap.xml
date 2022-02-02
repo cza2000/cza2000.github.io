@@ -2,23 +2,36 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>https://example.com/archives/</loc>
+    <loc>https://cza2000.github.io/post/</loc>
+    <lastmod>2022-02-02T21:24:15+08:00</lastmod>
+  </url><url>
+    <loc>https://cza2000.github.io/p/test/</loc>
+    <lastmod>2022-02-02T21:24:15+08:00</lastmod>
+  </url><url>
+    <loc>https://cza2000.github.io/</loc>
+    <lastmod>2022-02-02T21:24:15+08:00</lastmod>
+  </url><url>
+    <loc>https://cza2000.github.io/p/my-first-post/</loc>
+    <lastmod>2022-01-31T14:38:17+08:00</lastmod>
+  </url><url>
+    <loc>https://cza2000.github.io/tags/</loc>
+    <lastmod>2022-01-31T14:38:17+08:00</lastmod>
+  </url><url>
+    <loc>https://cza2000.github.io/tags/testing/</loc>
+    <lastmod>2022-01-31T14:38:17+08:00</lastmod>
+  </url><url>
+    <loc>https://cza2000.github.io/archives/</loc>
     <lastmod>2019-05-28T00:00:00+00:00</lastmod>
   </url><url>
-    <loc>https://example.com/page/</loc>
+    <loc>https://cza2000.github.io/page/</loc>
     <lastmod>2019-05-28T00:00:00+00:00</lastmod>
   </url><url>
-    <loc>https://example.com/</loc>
-    <lastmod>2019-05-28T00:00:00+00:00</lastmod>
+    <loc>https://cza2000.github.io/about/</loc>
   </url><url>
-    <loc>https://example.com/about/</loc>
+    <loc>https://cza2000.github.io/categories/</loc>
   </url><url>
-    <loc>https://example.com/categories/</loc>
+    <loc>https://cza2000.github.io/links/</loc>
   </url><url>
-    <loc>https://example.com/links/</loc>
-  </url><url>
-    <loc>https://example.com/search/</loc>
-  </url><url>
-    <loc>https://example.com/tags/</loc>
+    <loc>https://cza2000.github.io/search/</loc>
   </url>
 </urlset>
