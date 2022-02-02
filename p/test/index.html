@@ -1,35 +1,41 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
     <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content='Lab1: MapReduce  Coordinator  核心结构体 RPC handler 核心逻辑   Worker  在本次lab中我们的任务是实现一个分布式的MapReduce，它由两个程序组成，Coordinator和Worker。只有一个Coordinator，一个或多个Worker并行执行。
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content='Lab1: MapReduce 在本次lab中我们的任务是实现一个分布式的MapReduce，它由两个程序组成，Coordinator和Worker。只有一个Coordinator，一个或多个Worker并行执行。
 每个Worker将通过RPC与Coordinator通信以请求一个Map或Reduce任务，之后从一个或多个文件中读取任务的输入，执行任务，并将任务的输出写入一个或多个文件。
 Coordinator应注意到Worker是否在合理的时间内（10s）完成了任务，如果没有则将相同的任务交给另一个Worker。
-Coordinator 写这个lab的时候刚学go语言不久，觉得channel这个东西很帅，就使用了很多channel实现了一个lock-free版本的Coordinator，实践了一下csp。
-核心结构体 Coordinator维护每一个Map和Reduce任务的状态，这样就不用维护每一个worker的状态，这也利于worker的弹性伸缩。
+Coordinator 写这个lab的时候刚学go语言不久，觉得channel这个东西很帅，就使用了很多channel实现了一个lock-free版本的Coordinator，算是实践了一下csp。
+核心结构体 Coordinator维护每一个Map和Reduce任务的状态，这样就不用维护每一个worker的状态，也利于worker的弹性伸缩。
 xxxidCh用于在获取任务编号并发放给worker，xxxDoneCh和xxxUndoneCh用于获取完成或未完成的任务编号修改任务状态。
-type Coordinator struct { files []string nMap int nReduce int mapidCh chan int reduceidCh chan int mapStatus []Task reduceStatus []Task heartbeatCh chan heartbeatMsg reportCh chan reportMsg stateCh chan getStateMsg mapDoneCh chan Execution reduceDoneCh chan Execution mapUndoneCh chan Execution reduceUndoneCh chan Execution mapComplete bool reduceComplete bool mapRemain int reduceRemain int } 每个任务的状态有3种，每个任务被初始化时都是UnStarted，被分配给Worker之后转换为Processing，收到Report完成转为Done，未完成转为UnStarted。'><title>Test</title>
+type Coordinator struct { files []string nMap int nReduce int mapidCh chan int reduceidCh chan int mapStatus []Task reduceStatus []Task heartbeatCh chan heartbeatMsg reportCh chan reportMsg stateCh chan getStateMsg mapDoneCh chan Execution reduceDoneCh chan Execution mapUndoneCh chan Execution reduceUndoneCh chan Execution mapComplete bool reduceComplete bool mapRemain int reduceRemain int } 每个任务的状态有3种，每个任务被初始化时都是UnStarted，被分配给Worker之后转换为Processing，收到Report完成转为Done，未完成转为UnStarted。
+结构体Task用term和任务状态共同表示一个任务的信息，term代表该任务被分配给worker执行的次数。
+type TaskStatus int const ( UnStarted TaskStatus = iota Processing Done ) type Task struct { term int TaskStatus } RPC-handler Coordinator接收到RPC之后，包装出一个xxxMsg结构，传入RPC对应的channel中。'><title>Test</title>
 
 <link rel='canonical' href='https://cza2000.github.io/p/test/'>
 
 <link rel="stylesheet" href="/scss/style.min.168c117a0decd446482bf07d0106a16fde6d69c29ea758b67d14d5a1736de0f8.css"><meta property='og:title' content='Test'>
-<meta property='og:description' content='Lab1: MapReduce  Coordinator  核心结构体 RPC handler 核心逻辑   Worker  在本次lab中我们的任务是实现一个分布式的MapReduce，它由两个程序组成，Coordinator和Worker。只有一个Coordinator，一个或多个Worker并行执行。
+<meta property='og:description' content='Lab1: MapReduce 在本次lab中我们的任务是实现一个分布式的MapReduce，它由两个程序组成，Coordinator和Worker。只有一个Coordinator，一个或多个Worker并行执行。
 每个Worker将通过RPC与Coordinator通信以请求一个Map或Reduce任务，之后从一个或多个文件中读取任务的输入，执行任务，并将任务的输出写入一个或多个文件。
 Coordinator应注意到Worker是否在合理的时间内（10s）完成了任务，如果没有则将相同的任务交给另一个Worker。
-Coordinator 写这个lab的时候刚学go语言不久，觉得channel这个东西很帅，就使用了很多channel实现了一个lock-free版本的Coordinator，实践了一下csp。
-核心结构体 Coordinator维护每一个Map和Reduce任务的状态，这样就不用维护每一个worker的状态，这也利于worker的弹性伸缩。
+Coordinator 写这个lab的时候刚学go语言不久，觉得channel这个东西很帅，就使用了很多channel实现了一个lock-free版本的Coordinator，算是实践了一下csp。
+核心结构体 Coordinator维护每一个Map和Reduce任务的状态，这样就不用维护每一个worker的状态，也利于worker的弹性伸缩。
 xxxidCh用于在获取任务编号并发放给worker，xxxDoneCh和xxxUndoneCh用于获取完成或未完成的任务编号修改任务状态。
-type Coordinator struct { files []string nMap int nReduce int mapidCh chan int reduceidCh chan int mapStatus []Task reduceStatus []Task heartbeatCh chan heartbeatMsg reportCh chan reportMsg stateCh chan getStateMsg mapDoneCh chan Execution reduceDoneCh chan Execution mapUndoneCh chan Execution reduceUndoneCh chan Execution mapComplete bool reduceComplete bool mapRemain int reduceRemain int } 每个任务的状态有3种，每个任务被初始化时都是UnStarted，被分配给Worker之后转换为Processing，收到Report完成转为Done，未完成转为UnStarted。'>
+type Coordinator struct { files []string nMap int nReduce int mapidCh chan int reduceidCh chan int mapStatus []Task reduceStatus []Task heartbeatCh chan heartbeatMsg reportCh chan reportMsg stateCh chan getStateMsg mapDoneCh chan Execution reduceDoneCh chan Execution mapUndoneCh chan Execution reduceUndoneCh chan Execution mapComplete bool reduceComplete bool mapRemain int reduceRemain int } 每个任务的状态有3种，每个任务被初始化时都是UnStarted，被分配给Worker之后转换为Processing，收到Report完成转为Done，未完成转为UnStarted。
+结构体Task用term和任务状态共同表示一个任务的信息，term代表该任务被分配给worker执行的次数。
+type TaskStatus int const ( UnStarted TaskStatus = iota Processing Done ) type Task struct { term int TaskStatus } RPC-handler Coordinator接收到RPC之后，包装出一个xxxMsg结构，传入RPC对应的channel中。'>
 <meta property='og:url' content='https://cza2000.github.io/p/test/'>
 <meta property='og:site_name' content='Ziann Chen&#39;s blog'>
 <meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:published_time' content='2022-02-02T21:24:15&#43;08:00'/><meta property='article:modified_time' content='2022-02-02T21:24:15&#43;08:00'/><meta property='og:image' content='https://cza2000.github.io/img/avatar.png' />
 <meta name="twitter:title" content="Test">
-<meta name="twitter:description" content="Lab1: MapReduce  Coordinator  核心结构体 RPC handler 核心逻辑   Worker  在本次lab中我们的任务是实现一个分布式的MapReduce，它由两个程序组成，Coordinator和Worker。只有一个Coordinator，一个或多个Worker并行执行。
+<meta name="twitter:description" content="Lab1: MapReduce 在本次lab中我们的任务是实现一个分布式的MapReduce，它由两个程序组成，Coordinator和Worker。只有一个Coordinator，一个或多个Worker并行执行。
 每个Worker将通过RPC与Coordinator通信以请求一个Map或Reduce任务，之后从一个或多个文件中读取任务的输入，执行任务，并将任务的输出写入一个或多个文件。
 Coordinator应注意到Worker是否在合理的时间内（10s）完成了任务，如果没有则将相同的任务交给另一个Worker。
-Coordinator 写这个lab的时候刚学go语言不久，觉得channel这个东西很帅，就使用了很多channel实现了一个lock-free版本的Coordinator，实践了一下csp。
-核心结构体 Coordinator维护每一个Map和Reduce任务的状态，这样就不用维护每一个worker的状态，这也利于worker的弹性伸缩。
+Coordinator 写这个lab的时候刚学go语言不久，觉得channel这个东西很帅，就使用了很多channel实现了一个lock-free版本的Coordinator，算是实践了一下csp。
+核心结构体 Coordinator维护每一个Map和Reduce任务的状态，这样就不用维护每一个worker的状态，也利于worker的弹性伸缩。
 xxxidCh用于在获取任务编号并发放给worker，xxxDoneCh和xxxUndoneCh用于获取完成或未完成的任务编号修改任务状态。
-type Coordinator struct { files []string nMap int nReduce int mapidCh chan int reduceidCh chan int mapStatus []Task reduceStatus []Task heartbeatCh chan heartbeatMsg reportCh chan reportMsg stateCh chan getStateMsg mapDoneCh chan Execution reduceDoneCh chan Execution mapUndoneCh chan Execution reduceUndoneCh chan Execution mapComplete bool reduceComplete bool mapRemain int reduceRemain int } 每个任务的状态有3种，每个任务被初始化时都是UnStarted，被分配给Worker之后转换为Processing，收到Report完成转为Done，未完成转为UnStarted。"><meta name="twitter:card" content="summary_large_image">
+type Coordinator struct { files []string nMap int nReduce int mapidCh chan int reduceidCh chan int mapStatus []Task reduceStatus []Task heartbeatCh chan heartbeatMsg reportCh chan reportMsg stateCh chan getStateMsg mapDoneCh chan Execution reduceDoneCh chan Execution mapUndoneCh chan Execution reduceUndoneCh chan Execution mapComplete bool reduceComplete bool mapRemain int reduceRemain int } 每个任务的状态有3种，每个任务被初始化时都是UnStarted，被分配给Worker之后转换为Processing，收到Report完成转为Done，未完成转为UnStarted。
+结构体Task用term和任务状态共同表示一个任务的信息，term代表该任务被分配给worker执行的次数。
+type TaskStatus int const ( UnStarted TaskStatus = iota Processing Done ) type Task struct { term int TaskStatus } RPC-handler Coordinator接收到RPC之后，包装出一个xxxMsg结构，传入RPC对应的channel中。"><meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:image" content='https://cza2000.github.io/img/avatar.png' />
     </head>
     <body class="
@@ -109,7 +115,7 @@ type Coordinator struct { files []string nMap int nReduce int mapidCh chan int r
         
         <div>
             <time class="article-words">
-                374字
+                368字
             </time>
         </div>
         
@@ -122,23 +128,13 @@ type Coordinator struct { files []string nMap int nReduce int mapidCh chan int r
     
     
     <h1 id="lab1-mapreduce">Lab1: MapReduce</h1>
-<ul>
-<li><a class="link" href="#Coordinator" >Coordinator</a>
-<ul>
-<li><a class="link" href="#%e6%a0%b8%e5%bf%83%e7%bb%93%e6%9e%84%e4%bd%93" >核心结构体</a></li>
-<li><a class="link" href="#RPC-handler" >RPC handler</a></li>
-<li><a class="link" href="#%e6%a0%b8%e5%bf%83%e9%80%bb%e8%be%91" >核心逻辑</a></li>
-</ul>
-</li>
-<li><a class="link" href="#Worker" >Worker</a></li>
-</ul>
 <p>在本次lab中我们的任务是实现一个分布式的MapReduce，它由两个程序组成，Coordinator和Worker。只有一个Coordinator，一个或多个Worker并行执行。</p>
 <p>每个Worker将通过RPC与Coordinator通信以请求一个Map或Reduce任务，之后从一个或多个文件中读取任务的输入，执行任务，并将任务的输出写入一个或多个文件。</p>
 <p>Coordinator应注意到Worker是否在合理的时间内（10s）完成了任务，如果没有则将相同的任务交给另一个Worker。</p>
 <h2 id="coordinator">Coordinator</h2>
-<p>写这个lab的时候刚学go语言不久，觉得channel这个东西很帅，就使用了很多channel实现了一个lock-free版本的Coordinator，实践了一下csp。</p>
+<p>写这个lab的时候刚学go语言不久，觉得channel这个东西很帅，就使用了很多channel实现了一个lock-free版本的Coordinator，算是实践了一下csp。</p>
 <h3 id="核心结构体">核心结构体</h3>
-<p>Coordinator维护每一个Map和Reduce任务的状态，这样就不用维护每一个worker的状态，这也利于worker的弹性伸缩。</p>
+<p>Coordinator维护每一个Map和Reduce任务的状态，这样就不用维护每一个worker的状态，也利于worker的弹性伸缩。</p>
 <p>xxxidCh用于在获取任务编号并发放给worker，xxxDoneCh和xxxUndoneCh用于获取完成或未完成的任务编号修改任务状态。</p>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="kd">type</span> <span class="nx">Coordinator</span> <span class="kd">struct</span> <span class="p">{</span>
 	<span class="nx">files</span>          <span class="p">[]</span><span class="kt">string</span>
@@ -169,6 +165,7 @@ type Coordinator struct { files []string nMap int nReduce int mapidCh chan int r
 	<span class="nx">Processing</span>
 	<span class="nx">Done</span>
 <span class="p">)</span>
+
 <span class="kd">type</span> <span class="nx">Task</span> <span class="kd">struct</span> <span class="p">{</span>
 	<span class="nx">term</span> <span class="kt">int</span>
 	<span class="nx">TaskStatus</span>
@@ -180,10 +177,12 @@ type Coordinator struct { files []string nMap int nReduce int mapidCh chan int r
 	<span class="nx">response</span> <span class="o">*</span><span class="nx">HeartbeatResponse</span>
 	<span class="nx">Done</span>       <span class="kd">chan</span> <span class="kd">struct</span><span class="p">{}</span>
 <span class="p">}</span>
+
 <span class="kd">type</span> <span class="nx">reportMsg</span> <span class="kd">struct</span> <span class="p">{</span>
 	<span class="nx">request</span> <span class="o">*</span><span class="nx">ReportRequest</span>
 	<span class="nx">Done</span>      <span class="kd">chan</span> <span class="kd">struct</span><span class="p">{}</span>
 <span class="p">}</span>
+
 <span class="kd">func</span> <span class="p">(</span><span class="nx">c</span> <span class="o">*</span><span class="nx">Coordinator</span><span class="p">)</span> <span class="nf">Heartbeat</span><span class="p">(</span><span class="nx">request</span> <span class="o">*</span><span class="nx">HeartbeatRequest</span><span class="p">,</span> <span class="nx">response</span> <span class="o">*</span><span class="nx">HeartbeatResponse</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
 	<span class="nx">log</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;[Coordinator] receive a request from worker&#34;</span><span class="p">)</span>
 	<span class="nx">msg</span> <span class="o">:=</span> <span class="nx">heartbeatMsg</span><span class="p">{</span>
@@ -195,6 +194,7 @@ type Coordinator struct { files []string nMap int nReduce int mapidCh chan int r
 	<span class="nx">log</span><span class="p">.</span><span class="nf">Printf</span><span class="p">(</span><span class="s">&#34;[Coordinator] run heartbeat [%s] for worker&#34;</span><span class="p">,</span> <span class="nx">response</span><span class="p">)</span>
 	<span class="k">return</span> <span class="kc">nil</span>
 <span class="p">}</span>
+
 <span class="kd">func</span> <span class="p">(</span><span class="nx">c</span> <span class="o">*</span><span class="nx">Coordinator</span><span class="p">)</span> <span class="nf">Report</span><span class="p">(</span><span class="nx">request</span> <span class="o">*</span><span class="nx">ReportRequest</span><span class="p">,</span> <span class="nx">response</span> <span class="o">*</span><span class="nx">ReportResponse</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
 	<span class="nx">log</span><span class="p">.</span><span class="nf">Printf</span><span class="p">(</span><span class="s">&#34;[Coordinator] receive worker&#39;s report [%s]&#34;</span><span class="p">,</span> <span class="nx">request</span><span class="p">)</span>
 	<span class="nx">msg</span> <span class="o">:=</span> <span class="nx">reportMsg</span><span class="p">{</span>
@@ -224,24 +224,30 @@ type Coordinator struct { files []string nMap int nReduce int mapidCh chan int r
 		<span class="k">select</span> <span class="p">{</span>
 		<span class="k">case</span> <span class="nx">hbMsg</span> <span class="o">:=</span> <span class="o">&lt;-</span><span class="nx">c</span><span class="p">.</span><span class="nx">heartbeatCh</span><span class="p">:</span>
 			<span class="nx">c</span><span class="p">.</span><span class="nf">handleHeartbeatMsg</span><span class="p">(</span><span class="nx">hbMsg</span><span class="p">)</span>
+
 		<span class="k">case</span> <span class="nx">rpMsg</span> <span class="o">:=</span> <span class="o">&lt;-</span><span class="nx">c</span><span class="p">.</span><span class="nx">reportCh</span><span class="p">:</span>
 			<span class="k">go</span> <span class="nx">c</span><span class="p">.</span><span class="nf">handleReportMsg</span><span class="p">(</span><span class="nx">rpMsg</span><span class="p">)</span>
+
 		<span class="k">case</span> <span class="nx">e</span> <span class="o">:=</span> <span class="o">&lt;-</span><span class="nx">c</span><span class="p">.</span><span class="nx">mapDoneCh</span><span class="p">:</span>
 			<span class="k">if</span> <span class="nx">c</span><span class="p">.</span><span class="nx">mapStatus</span><span class="p">[</span><span class="nx">e</span><span class="p">.</span><span class="nx">id</span><span class="p">].</span><span class="nx">TaskStatus</span> <span class="o">==</span> <span class="nx">Processing</span> <span class="o">&amp;&amp;</span> <span class="nx">c</span><span class="p">.</span><span class="nx">mapStatus</span><span class="p">[</span><span class="nx">e</span><span class="p">.</span><span class="nx">id</span><span class="p">].</span><span class="nx">term</span> <span class="o">==</span> <span class="nx">e</span><span class="p">.</span><span class="nx">term</span> <span class="p">{</span>
 				<span class="err">···</span>
 			<span class="p">}</span>
+
 		<span class="k">case</span> <span class="nx">e</span> <span class="o">:=</span> <span class="o">&lt;-</span><span class="nx">c</span><span class="p">.</span><span class="nx">reduceDoneCh</span><span class="p">:</span>
 			<span class="k">if</span> <span class="nx">c</span><span class="p">.</span><span class="nx">reduceStatus</span><span class="p">[</span><span class="nx">e</span><span class="p">.</span><span class="nx">id</span><span class="p">].</span><span class="nx">TaskStatus</span> <span class="o">==</span> <span class="nx">Processing</span> <span class="o">&amp;&amp;</span> <span class="nx">c</span><span class="p">.</span><span class="nx">reduceStatus</span><span class="p">[</span><span class="nx">e</span><span class="p">.</span><span class="nx">id</span><span class="p">].</span><span class="nx">term</span> <span class="o">==</span> <span class="nx">e</span><span class="p">.</span><span class="nx">term</span> <span class="p">{</span>
 				<span class="err">···</span>
 			<span class="p">}</span>
+
 		<span class="k">case</span> <span class="nx">e</span> <span class="o">:=</span> <span class="o">&lt;-</span><span class="nx">c</span><span class="p">.</span><span class="nx">mapUndoneCh</span><span class="p">:</span>
 			<span class="k">if</span> <span class="nx">c</span><span class="p">.</span><span class="nx">mapStatus</span><span class="p">[</span><span class="nx">e</span><span class="p">.</span><span class="nx">id</span><span class="p">].</span><span class="nx">TaskStatus</span> <span class="o">==</span> <span class="nx">Processing</span> <span class="o">&amp;&amp;</span> <span class="nx">c</span><span class="p">.</span><span class="nx">mapStatus</span><span class="p">[</span><span class="nx">e</span><span class="p">.</span><span class="nx">id</span><span class="p">].</span><span class="nx">term</span> <span class="o">==</span> <span class="nx">e</span><span class="p">.</span><span class="nx">term</span> <span class="p">{</span>
 				<span class="err">···</span>
 			<span class="p">}</span>
+
 		<span class="k">case</span> <span class="nx">e</span> <span class="o">:=</span> <span class="o">&lt;-</span><span class="nx">c</span><span class="p">.</span><span class="nx">reduceUndoneCh</span><span class="p">:</span>
 			<span class="k">if</span> <span class="nx">c</span><span class="p">.</span><span class="nx">reduceStatus</span><span class="p">[</span><span class="nx">e</span><span class="p">.</span><span class="nx">id</span><span class="p">].</span><span class="nx">TaskStatus</span> <span class="o">==</span> <span class="nx">Processing</span> <span class="o">&amp;&amp;</span> <span class="nx">c</span><span class="p">.</span><span class="nx">reduceStatus</span><span class="p">[</span><span class="nx">e</span><span class="p">.</span><span class="nx">id</span><span class="p">].</span><span class="nx">term</span> <span class="o">==</span> <span class="nx">e</span><span class="p">.</span><span class="nx">term</span> <span class="p">{</span>
 				<span class="err">···</span>
 			<span class="p">}</span>
+
 		<span class="k">case</span> <span class="nx">stMsg</span> <span class="o">:=</span> <span class="o">&lt;-</span><span class="nx">c</span><span class="p">.</span><span class="nx">stateCh</span><span class="p">:</span>
 			<span class="nx">stMsg</span><span class="p">.</span><span class="nx">state</span> <span class="o">&lt;-</span> <span class="nx">c</span><span class="p">.</span><span class="nx">reduceComplete</span>
 		<span class="p">}</span>
@@ -258,12 +264,16 @@ type Coordinator struct { files []string nMap int nReduce int mapidCh chan int r
 		<span class="k">switch</span> <span class="nx">response</span><span class="p">.</span><span class="nx">Type</span> <span class="p">{</span>
 		<span class="k">case</span> <span class="nx">Map</span><span class="p">:</span>
 			<span class="nf">doMapTask</span><span class="p">(</span><span class="nx">mapf</span><span class="p">,</span> <span class="nx">response</span><span class="p">.</span><span class="nx">Id</span><span class="p">,</span> <span class="nx">response</span><span class="p">.</span><span class="nx">Term</span><span class="p">,</span> <span class="nx">response</span><span class="p">.</span><span class="nx">NReduce</span><span class="p">,</span> <span class="nx">response</span><span class="p">.</span><span class="nx">Name</span><span class="p">)</span>
+
 		<span class="k">case</span> <span class="nx">Reduce</span><span class="p">:</span>
 			<span class="nf">doReduceTask</span><span class="p">(</span><span class="nx">reducef</span><span class="p">,</span> <span class="nx">response</span><span class="p">.</span><span class="nx">Id</span><span class="p">,</span><span class="nx">response</span><span class="p">.</span><span class="nx">Term</span><span class="p">,</span> <span class="nx">response</span><span class="p">.</span><span class="nx">NMap</span><span class="p">)</span>
+
 		<span class="k">case</span> <span class="nx">Wait</span><span class="p">:</span>
 			<span class="nx">time</span><span class="p">.</span><span class="nf">Sleep</span><span class="p">(</span><span class="mi">1</span> <span class="o">*</span> <span class="nx">time</span><span class="p">.</span><span class="nx">Second</span><span class="p">)</span>
+
 		<span class="k">case</span> <span class="nx">Completed</span><span class="p">:</span>
 			<span class="k">return</span>
+			
 		<span class="k">default</span><span class="p">:</span>
 			<span class="nb">panic</span><span class="p">(</span><span class="nx">fmt</span><span class="p">.</span><span class="nf">Sprintf</span><span class="p">(</span><span class="s">&#34;[Worker] unexpected jobType %v&#34;</span><span class="p">,</span> <span class="nx">response</span><span class="p">.</span><span class="nx">Type</span><span class="p">))</span>
 		<span class="p">}</span>
