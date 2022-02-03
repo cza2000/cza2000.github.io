@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content='lab2'><title>Raft</title>
+
+<link rel='canonical' href='https://cza2000.github.io/2022/raft/'>
+
+<link rel="stylesheet" href="/scss/style.min.5f343aefda6021d7c99a35d0d8a06abdad13d86982967b5b28f1008e404a346d.css"><meta property='og:title' content='Raft'>
+<meta property='og:description' content='lab2'>
+<meta property='og:url' content='https://cza2000.github.io/2022/raft/'>
+<meta property='og:site_name' content='Ziann Chen&#39;s blog'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='分布式系统' /><meta property='article:published_time' content='2022-02-03T15:04:30&#43;08:00'/><meta property='article:modified_time' content='2022-02-03T15:04:30&#43;08:00'/><meta property='og:image' content='https://cza2000.github.io/img/avatar.png' />
+<meta name="twitter:title" content="Raft">
+<meta name="twitter:description" content="lab2"><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://cza2000.github.io/img/avatar.png' />
+    </head>
+    <body class="
+    article-page has-toc
+">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex 
+    
+        extended
+    
+">
+    
+        <div id="article-toolbar">
+            <a href="/" class="back-home">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="15 6 9 12 15 18" />
+</svg>
+
+
+
+                <span>Back</span>
+            </a>
+        </div>
+    
+<main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+    <header class="article-category">
+        
+            <a href="/categories/mit6.824/" >
+                mit6.824
+            </a>
+        
+    </header>
+    
+
+    <h2 class="article-title">
+        <a href="/2022/raft/">Raft</a>
+    </h2>
+
+    
+    <h3 class="article-subtitle">
+        lab2
+    </h3>
+    
+
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">Feb 03, 2022</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    5 minute read
+                </time>
+            </div>
+        
+    </footer>
+    
+</div>
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="lab2-raft">Lab2: Raft</h1>
+<p>lab原链接 <a class="link" href="https://pdos.csail.mit.edu/6.824/labs/lab-raft.html"  target="_blank" rel="noopener"
+    >https://pdos.csail.mit.edu/6.824/labs/lab-raft.html</a></p>
+<p>Raft是一种基于复制的状态机协议，通过在多个副本服务器上存储其状态（即数据）的完整副本来实现容错。</p>
+<p>Raft将客户端请求组织成一个称为日志的序列，并通过复制确保所有副本服务器都看到相同的日志。每个副本按日志顺序执行客户端请求，并将它们应用于本地的状态机副本。由于所有副本服务器都看到相同的日志内容，因此它们都以相同的顺序执行相同的请求，从而继续具有相同的服务状态。如果服务器出现故障但随后恢复，Raft保证只要至少半数的服务器存活，并且可以相互通信，就可以保证正常对外服务。</p>
+<p>在本次lab中我们的任务是使用go语言实现raft。参考论文 <a class="link" href="https://pdos.csail.mit.edu/6.824/papers/raft-extended.pdf"  target="_blank" rel="noopener"
+    >raft-extended</a>，我们需要实现除了集群成员变更之外的绝大部分内容。论文中我认为最核心的就是描述3个RPC的(Figure 2)这张图，我的实现大体上遵循了这张图。此外我也参考了一些工业级的raft实现，比如SOFAJraft、etcd，做了一些优化。在我秋招面试美团的一个做分布式存储的部门时，他们问了我很多关于raft的内容（虽然最后挂了）。</p>
+<p>有些需要注意的点：</p>
+<ul>
+<li>当收到的RPC中的term大于自身时，无条件跟随term并转为follower，这在不同的RPC handler中的处理略有不同。</li>
+<li>在lab的一些测试用例中，网络将是不稳定的，带来大量随机的RPC丢包、乱序、超时。对于过期的RPC，直接抛弃不处理即可。对于是否过期的判断体现在term太小、身份不正确之类（例如follow收到append entries response）。</li>
+<li>锁的使用：在接发RPC、读写channel时一定不要持有锁，不然很有可能死锁。此外有许多代码块对Raft结构中各字段是只读的，我使用了读写锁。</li>
+</ul>
+<h2 id="结构体">结构体</h2>
+<p>Raft结构中的各个变量和论文大致一样。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#8be9fd;font-style:italic">type</span> Raft <span style="color:#8be9fd;font-style:italic">struct</span> {
+	rw        sync.RWMutex        <span style="color:#6272a4">// Lock to protect shared access to this peer&#39;s state
+</span><span style="color:#6272a4"></span>	peers     []<span style="color:#ff79c6">*</span>labrpc.ClientEnd <span style="color:#6272a4">// RPC end points of all peers
+</span><span style="color:#6272a4"></span>	persister <span style="color:#ff79c6">*</span>Persister          <span style="color:#6272a4">// Object to hold this peer&#39;s persisted state
+</span><span style="color:#6272a4"></span>	me        <span style="color:#8be9fd">int</span>                 <span style="color:#6272a4">// this peer&#39;s index into peers[]
+</span><span style="color:#6272a4"></span>	dead      <span style="color:#8be9fd">int32</span>               <span style="color:#6272a4">// set by Kill()
+</span><span style="color:#6272a4"></span>	<span style="color:#6272a4">// Your data here (2A, 2B, 2C).
+</span><span style="color:#6272a4"></span>	<span style="color:#6272a4">// Look at the paper&#39;s Figure 2 for a description of what
+</span><span style="color:#6272a4"></span>	<span style="color:#6272a4">// state a Raft server must maintain.
+</span><span style="color:#6272a4"></span>
+	currentState   State
+	currentTerm    <span style="color:#8be9fd">int</span>
+	votedFor       <span style="color:#8be9fd">int</span>
+	voteFrom       <span style="color:#8be9fd;font-style:italic">map</span>[<span style="color:#8be9fd">int</span>]<span style="color:#8be9fd">bool</span>
+	logs           []LogEntry
+	commitIndex    <span style="color:#8be9fd">int</span>
+	lastApplied    <span style="color:#8be9fd">int</span>
+	nextIndex      []<span style="color:#8be9fd">int</span>
+	matchIndex     []<span style="color:#8be9fd">int</span>
+	electionTimer  <span style="color:#ff79c6">*</span>time.Timer
+	heartbeatTimer <span style="color:#ff79c6">*</span>time.Timer
+	applyCh        <span style="color:#8be9fd;font-style:italic">chan</span> ApplyMsg
+	applierCond    sync.Cond
+	replicatorCond []sync.Cond
+}
+
+<span style="color:#8be9fd;font-style:italic">func</span> <span style="color:#50fa7b">Make</span>(peers []<span style="color:#ff79c6">*</span>labrpc.ClientEnd, me <span style="color:#8be9fd">int</span>,
+	persister <span style="color:#ff79c6">*</span>Persister, applyCh <span style="color:#8be9fd;font-style:italic">chan</span> ApplyMsg) <span style="color:#ff79c6">*</span>Raft {
+	<span style="color:#6272a4">// Your initialization code here (2A, 2B, 2C).
+</span><span style="color:#6272a4"></span>	rf <span style="color:#ff79c6">:=</span> <span style="color:#ff79c6">&amp;</span>Raft{
+		rw:             sync.RWMutex{},
+		peers:          peers,
+		persister:      persister,
+		me:             me,
+		dead:           <span style="color:#ff79c6">-</span><span style="color:#bd93f9">1</span>,
+		currentState:   Follower,
+		currentTerm:    <span style="color:#bd93f9">0</span>,
+		votedFor:       <span style="color:#ff79c6">-</span><span style="color:#bd93f9">1</span>,
+		voteFrom:       <span style="color:#8be9fd;font-style:italic">make</span>(<span style="color:#8be9fd;font-style:italic">map</span>[<span style="color:#8be9fd">int</span>]<span style="color:#8be9fd">bool</span>),
+		logs:           <span style="color:#8be9fd;font-style:italic">make</span>([]LogEntry, <span style="color:#bd93f9">1</span>),
+		nextIndex:      <span style="color:#8be9fd;font-style:italic">make</span>([]<span style="color:#8be9fd">int</span>, <span style="color:#8be9fd;font-style:italic">len</span>(peers)),
+		matchIndex:     <span style="color:#8be9fd;font-style:italic">make</span>([]<span style="color:#8be9fd">int</span>, <span style="color:#8be9fd;font-style:italic">len</span>(peers)),
+		electionTimer:  time.<span style="color:#50fa7b">NewTimer</span>(<span style="color:#50fa7b">RandomizedElectionTimeout</span>()),
+		heartbeatTimer: time.<span style="color:#50fa7b">NewTimer</span>(<span style="color:#50fa7b">StableHeartbeatTimeout</span>()),
+		applyCh:        applyCh,
+		replicatorCond: <span style="color:#8be9fd;font-style:italic">make</span>([]sync.Cond, <span style="color:#8be9fd;font-style:italic">len</span>(peers)),
+	}
+
+	rf.applierCond = <span style="color:#ff79c6">*</span>sync.<span style="color:#50fa7b">NewCond</span>(<span style="color:#ff79c6">&amp;</span>rf.rw)
+	rf.logs[<span style="color:#bd93f9">0</span>] = LogEntry{<span style="color:#bd93f9">0</span>, <span style="color:#bd93f9">0</span>, <span style="color:#ff79c6">nil</span>}
+	<span style="color:#6272a4">// initialize from state persisted before a crash
+</span><span style="color:#6272a4"></span>	rf.<span style="color:#50fa7b">readPersist</span>(persister.<span style="color:#50fa7b">ReadRaftState</span>())
+	rf.commitIndex, rf.lastApplied = rf.logs[<span style="color:#bd93f9">0</span>].Index, rf.logs[<span style="color:#bd93f9">0</span>].Index
+	<span style="color:#ff79c6">for</span> i <span style="color:#ff79c6">:=</span> <span style="color:#bd93f9">0</span>; i &lt; <span style="color:#8be9fd;font-style:italic">len</span>(peers); i<span style="color:#ff79c6">++</span> {
+		rf.matchIndex[i], rf.nextIndex[i] = <span style="color:#bd93f9">0</span>, rf.<span style="color:#50fa7b">getLastLogEntry</span>().Index<span style="color:#ff79c6">+</span><span style="color:#bd93f9">1</span>
+		<span style="color:#ff79c6">if</span> i <span style="color:#ff79c6">==</span> me {
+			<span style="color:#ff79c6">continue</span>
+		}
+
+		rf.replicatorCond[i] = <span style="color:#ff79c6">*</span>sync.<span style="color:#50fa7b">NewCond</span>(<span style="color:#ff79c6">&amp;</span>sync.Mutex{})
+		<span style="color:#ff79c6">go</span> rf.<span style="color:#50fa7b">replicator</span>(i)
+	}
+
+	<span style="color:#6272a4">// start ticker goroutine to start elections
+</span><span style="color:#6272a4"></span>	<span style="color:#ff79c6">go</span> rf.<span style="color:#50fa7b">ticker</span>()
+
+	<span style="color:#ff79c6">go</span> rf.<span style="color:#50fa7b">applier</span>(rf.applyCh)
+
+	<span style="color:#ff79c6">return</span> rf
+}
+</code></pre></div><p>根据论文，日志的index和term都从1开始，所以在logs[0]处存放一个index和term均为0的dummy value。</p>
+<p>在Make函数中启动了一些后台协程</p>
+<ul>
+<li>replicator：共len(peers)-1个，用于管理leader对每一个follower的日志复制，下文会详细介绍。</li>
+<li>ticker：用来触发选举和心跳timeout。</li>
+<li>applier：用于向applyCh中提交已经commit的日志。</li>
+</ul>
+<h2 id="leader-election">leader-election</h2>
+<h3 id="sender">sender</h3>
+<p>在ticker函数中需要循环使用select监听两个timer的channel，lab的提示中说使用timer可能会有问题但我没有遇到过，懒得改了。</p>
+<p>如果是选举计时器到期，则发起一轮选举；如果是心跳计时器到期，则发起一轮心跳。二者都要首先判断当前身份是否正确。我使用了一个map来记录当前term中投票给自己的peer，需要在每次转换为candidate时清空map。也可以每次start election时声明一个得票计数，之后使用闭包来计算。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#8be9fd;font-style:italic">func</span> (rf <span style="color:#ff79c6">*</span>Raft) <span style="color:#50fa7b">ticker</span>() {
+	<span style="color:#ff79c6">for</span> !rf.<span style="color:#50fa7b">Killed</span>() {
+		<span style="color:#ff79c6">select</span> {
+		<span style="color:#ff79c6">case</span> <span style="color:#ff79c6">&lt;-</span>rf.electionTimer.C:
+			rf.rw.<span style="color:#50fa7b">Lock</span>()
+			<span style="color:#ff79c6">if</span> rf.currentState <span style="color:#ff79c6">!=</span> Leader {
+				rf.currentState = Candidate
+				rf.voteFrom = <span style="color:#8be9fd;font-style:italic">make</span>(<span style="color:#8be9fd;font-style:italic">map</span>[<span style="color:#8be9fd">int</span>]<span style="color:#8be9fd">bool</span>)
+				rf.currentTerm<span style="color:#ff79c6">++</span>
+				rf.<span style="color:#50fa7b">startElection</span>()
+			}
+
+			rf.electionTimer.<span style="color:#50fa7b">Reset</span>(<span style="color:#50fa7b">RandomizedElectionTimeout</span>())
+			rf.rw.<span style="color:#50fa7b">Unlock</span>()
+
+		<span style="color:#ff79c6">case</span> <span style="color:#ff79c6">&lt;-</span>rf.heartbeatTimer.C:
+			rf.rw.<span style="color:#50fa7b">Lock</span>()
+			<span style="color:#ff79c6">if</span> rf.currentState <span style="color:#ff79c6">==</span> Leader {
+				<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[Server %d] boardcast heartbeat at term %d&#34;</span>, rf.me, rf.currentTerm)
+				rf.<span style="color:#50fa7b">boardcastHeartbeat</span>(<span style="color:#ff79c6">true</span>)
+			}
+
+			rf.rw.<span style="color:#50fa7b">Unlock</span>()
+		}
+	}
+}
+</code></pre></div><p>选举需要异步对每个peer发送request vote，不然就太慢了。异步才不会阻塞ticker，能快速重置计时器。response handler中要先判断是否仍满足rf.currentTerm == args.Term &amp;&amp; rf.currentState == Candidate，若不满足说明RPC过期，直接抛弃不处理。</p>
+<p>我之所以没有使用闭包是因为这样难以抽象出一个 handleRequestVoteResponse 函数，代码结构不够统一。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#8be9fd;font-style:italic">func</span> (rf <span style="color:#ff79c6">*</span>Raft) <span style="color:#50fa7b">startElection</span>() {
+	args <span style="color:#ff79c6">:=</span> rf.<span style="color:#50fa7b">getDefaultRequestVoteArgs</span>()
+	rf.votedFor, rf.voteFrom[rf.me] = rf.me, <span style="color:#ff79c6">true</span>
+	rf.<span style="color:#50fa7b">persist</span>()
+	<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[Server %d] start election at term %d&#34;</span>, rf.me, rf.currentTerm)
+	<span style="color:#ff79c6">for</span> index <span style="color:#ff79c6">:=</span> <span style="color:#ff79c6">range</span> rf.peers {
+		<span style="color:#ff79c6">if</span> index <span style="color:#ff79c6">==</span> rf.me {
+			<span style="color:#ff79c6">continue</span>
+		}
+
+		<span style="color:#ff79c6">go</span> <span style="color:#8be9fd;font-style:italic">func</span>(i <span style="color:#8be9fd">int</span>) {
+			reply <span style="color:#ff79c6">:=</span> RequestVoteReply{}
+			<span style="color:#ff79c6">if</span> rf.<span style="color:#50fa7b">sendRequestVote</span>(i, <span style="color:#ff79c6">&amp;</span>args, <span style="color:#ff79c6">&amp;</span>reply) {
+				rf.rw.<span style="color:#50fa7b">Lock</span>()
+				rf.<span style="color:#50fa7b">handleRequestVoteResponse</span>(i, <span style="color:#ff79c6">&amp;</span>args, <span style="color:#ff79c6">&amp;</span>reply)
+				rf.rw.<span style="color:#50fa7b">Unlock</span>()
+			}
+		}(index)
+	}
+}
+</code></pre></div><h3 id="handler">handler</h3>
+<p>handler的实现完全参照论文，先判断term是否小于自身，再判断term、voteFor和日志是否满足条件。判断voteFor时要先满足args.Term == rf.currentTerm，这是由于args.Term &gt; rf.currentTerm时需要无条件跟随term并重置voteFor。</p>
+<p>需要注意的是只有同意投票时才需要重置election timer，这在课程的TA的guidance中有提及，有利于在网络不稳定时仍能快速选出leader。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#8be9fd;font-style:italic">func</span> (rf <span style="color:#ff79c6">*</span>Raft) <span style="color:#50fa7b">RequestVote</span>(args <span style="color:#ff79c6">*</span>RequestVoteArgs, reply <span style="color:#ff79c6">*</span>RequestVoteReply) {
+	<span style="color:#6272a4">// Your code here (2A, 2B).
+</span><span style="color:#6272a4"></span>	<span style="color:#ff79c6">defer</span> rf.rw.<span style="color:#50fa7b">Unlock</span>()
+	<span style="color:#ff79c6">defer</span> <span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[Server %d] reply [%s] for RequestVote to %d&#34;</span>, rf.me, reply, args.CandidateId)
+
+	rf.rw.<span style="color:#50fa7b">Lock</span>()
+	<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[Server %d][state %s term %d vote %d lastindex %d lastterm %d] receive RequestVote [%s] from %d&#34;</span>, rf.me, StateName[rf.currentState], rf.currentTerm, rf.votedFor, rf.<span style="color:#50fa7b">getLastLogEntry</span>().Index, rf.<span style="color:#50fa7b">getLastLogEntry</span>().Term, args, args.CandidateId)
+
+	<span style="color:#ff79c6">if</span> args.Term &lt; rf.currentTerm <span style="color:#ff79c6">||</span> (args.Term <span style="color:#ff79c6">==</span> rf.currentTerm <span style="color:#ff79c6">&amp;&amp;</span> rf.votedFor <span style="color:#ff79c6">!=</span> <span style="color:#ff79c6">-</span><span style="color:#bd93f9">1</span> <span style="color:#ff79c6">&amp;&amp;</span> rf.votedFor <span style="color:#ff79c6">!=</span> args.CandidateId) {
+		reply.Term, reply.VoteGranted = rf.currentTerm, <span style="color:#ff79c6">false</span>
+		<span style="color:#ff79c6">return</span>
+	}
+
+	needToPersist <span style="color:#ff79c6">:=</span> <span style="color:#ff79c6">false</span>
+	<span style="color:#ff79c6">if</span> args.Term &gt; rf.currentTerm {
+		rf.currentTerm, rf.votedFor = args.Term, <span style="color:#ff79c6">-</span><span style="color:#bd93f9">1</span>
+		<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[Server %d] change state from Leader to Follower at term %d&#34;</span>, rf.me, rf.currentTerm)
+		rf.currentState = Follower
+		needToPersist = <span style="color:#ff79c6">true</span>
+	}
+
+	<span style="color:#ff79c6">if</span> !rf.<span style="color:#50fa7b">isLogUpToDate</span>(args.LastLogIndex, args.LastLogTerm) {
+		reply.Term, reply.VoteGranted = rf.currentTerm, <span style="color:#ff79c6">false</span>
+		<span style="color:#ff79c6">if</span> needToPersist {
+			rf.<span style="color:#50fa7b">persist</span>()
+		}
+
+		<span style="color:#ff79c6">return</span>
+	}
+
+	reply.Term, reply.VoteGranted = rf.currentTerm, <span style="color:#ff79c6">true</span>
+	rf.votedFor = args.CandidateId
+	rf.<span style="color:#50fa7b">persist</span>()
+	rf.electionTimer.<span style="color:#50fa7b">Reset</span>(<span style="color:#50fa7b">RandomizedElectionTimeout</span>())
+}
+</code></pre></div><h2 id="log-replication">log-replication</h2>
+<h3 id="replicator">replicator</h3>
+<p>根据每个peer的nextIndex判断发送entries或是snapshot。</p>
+<p>response handler的实现参照论文，先判断是否过期，再判断是否成功。若成功，则更新match、next index。找到最新的复制到超过半数peer且term等于当前term的日志，更新commit。需要注意日志的term必须和当前term一致才能更新commit，不然可能会有安全性问题导致已经commit的日志被覆盖，我忘了哪个测试一直过不了后来发现就是这个原因，所以论文一定要非常仔细读。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#8be9fd;font-style:italic">func</span> (rf <span style="color:#ff79c6">*</span>Raft) <span style="color:#50fa7b">doReplicate</span>(i <span style="color:#8be9fd">int</span>) {
+	rf.rw.<span style="color:#50fa7b">RLock</span>()
+	<span style="color:#ff79c6">if</span> rf.currentState <span style="color:#ff79c6">!=</span> Leader {
+		rf.rw.<span style="color:#50fa7b">RUnlock</span>()
+		<span style="color:#ff79c6">return</span>
+	}
+
+	<span style="color:#ff79c6">if</span> rf.nextIndex[i] <span style="color:#ff79c6">&lt;=</span> rf.<span style="color:#50fa7b">getDummyLogntry</span>().Index {
+		args <span style="color:#ff79c6">:=</span> rf.<span style="color:#50fa7b">getDefaultInstallSnapshotArgs</span>()
+		rf.rw.<span style="color:#50fa7b">RUnlock</span>()
+
+		reply <span style="color:#ff79c6">:=</span> InstallSnapshotReply{}
+		<span style="color:#ff79c6">if</span> rf.<span style="color:#50fa7b">sendInstallSnapshot</span>(i, <span style="color:#ff79c6">&amp;</span>args, <span style="color:#ff79c6">&amp;</span>reply) {
+			rf.rw.<span style="color:#50fa7b">Lock</span>()
+			rf.<span style="color:#50fa7b">handleInstallSnapshotResponse</span>(i, args, reply)
+			rf.rw.<span style="color:#50fa7b">Unlock</span>()
+		}
+	} <span style="color:#ff79c6">else</span> {
+		args <span style="color:#ff79c6">:=</span> rf.<span style="color:#50fa7b">getDefaultAppendEntriesArgs</span>(i)
+		rf.rw.<span style="color:#50fa7b">RUnlock</span>()
+
+		reply <span style="color:#ff79c6">:=</span> AppendEntriesReply{}
+		<span style="color:#ff79c6">if</span> rf.<span style="color:#50fa7b">sendAppendEntries</span>(i, <span style="color:#ff79c6">&amp;</span>args, <span style="color:#ff79c6">&amp;</span>reply) {
+			rf.rw.<span style="color:#50fa7b">Lock</span>()
+			rf.<span style="color:#50fa7b">handleAppendEntriesReponse</span>(i, <span style="color:#ff79c6">&amp;</span>args, <span style="color:#ff79c6">&amp;</span>reply)
+			rf.rw.<span style="color:#50fa7b">Unlock</span>()
+		}
+	}
+}
+</code></pre></div><p>这里我参考了 <a class="link" href="https://github.com/LebronAl/MIT6.824-2021/blob/master/docs/lab2.md#%E5%A4%8D%E5%88%B6%E6%A8%A1%E5%9E%8B"  target="_blank" rel="noopener"
+    >LebronAI</a> 的设计。</p>
+<p>如果为每一次Start、心跳都广播发送一次append entries，则将下层的日志同步与上层的提交新指令强绑定了，会造成RPC数量过多，还会重复发送很多次相同的日志项。每次发送 rpc 都不论是发送端还是接收端都需要若干次系统调用和内存拷贝，rpc 次数过多也会对 CPU 造成不必要的压力。</p>
+<p>这里可以做一个batching的优化，也将二者之间解耦。这里原作者参考了SOFAJraft的日志复制模型，让每个peer对于其他所有peer各维护一个replicator协程，负责在自己成为leader时对单独一个peer的日志复制。</p>
+<p>这个协程利用条件变量 <code>sync.Cond</code> 执行 <code>Wait</code> 来避免耗费 cpu，每次需要进行一次日志复制时调用 <code>Signal</code> 唤醒。它在满足复制条件时会尽最大努力将[nextIndex, lastIndex]之间的日志复制到peer上。</p>
+<p>由于leader使用replicator维护对于一个peer的日志复制，同一时间下最多只会发送一个RPC，若RPC丢失、超时很可能触发re-election。因此：</p>
+<ul>
+<li>心跳计时器到期，很急，要立即发送RPC。leader commit更新时也要立即发送RPC，这个是为啥我忘记了。</li>
+<li>Start被调用，不急，只需调用条件变量的 <code>Singal</code>，让replicator慢慢发。</li>
+</ul>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#8be9fd;font-style:italic">func</span> (rf <span style="color:#ff79c6">*</span>Raft) <span style="color:#50fa7b">replicator</span>(peer <span style="color:#8be9fd">int</span>) {
+	rf.replicatorCond[peer].L.<span style="color:#50fa7b">Lock</span>()
+	<span style="color:#ff79c6">defer</span> rf.replicatorCond[peer].L.<span style="color:#50fa7b">Unlock</span>()
+
+	<span style="color:#ff79c6">for</span> !rf.<span style="color:#50fa7b">Killed</span>() {
+		<span style="color:#ff79c6">for</span> !rf.<span style="color:#50fa7b">needToReplicate</span>(peer) {
+			rf.replicatorCond[peer].<span style="color:#50fa7b">Wait</span>()
+		}
+
+		rf.<span style="color:#50fa7b">doReplicate</span>(peer)
+	}
+}
+
+<span style="color:#8be9fd;font-style:italic">func</span> (rf <span style="color:#ff79c6">*</span>Raft) <span style="color:#50fa7b">needToReplicate</span>(peer <span style="color:#8be9fd">int</span>) <span style="color:#8be9fd">bool</span> {
+	rf.rw.<span style="color:#50fa7b">RLock</span>()
+	<span style="color:#ff79c6">defer</span> rf.rw.<span style="color:#50fa7b">RUnlock</span>()
+
+	<span style="color:#ff79c6">return</span> rf.currentState <span style="color:#ff79c6">==</span> Leader <span style="color:#ff79c6">&amp;&amp;</span> rf.nextIndex[peer] <span style="color:#ff79c6">&lt;=</span> rf.<span style="color:#50fa7b">getLastLogEntry</span>().Index
+}
+ 
+<span style="color:#8be9fd;font-style:italic">func</span> (rf <span style="color:#ff79c6">*</span>Raft) <span style="color:#50fa7b">boardcastHeartbeat</span>(isHeartbeat <span style="color:#8be9fd">bool</span>) {
+	<span style="color:#ff79c6">for</span> index <span style="color:#ff79c6">:=</span> <span style="color:#ff79c6">range</span> rf.peers {
+		<span style="color:#ff79c6">if</span> index <span style="color:#ff79c6">==</span> rf.me {
+			<span style="color:#ff79c6">continue</span>
+		}
+
+		<span style="color:#ff79c6">if</span> isHeartbeat {
+			<span style="color:#ff79c6">go</span> rf.<span style="color:#50fa7b">doReplicate</span>(index)
+		} <span style="color:#ff79c6">else</span> {
+			rf.replicatorCond[index].<span style="color:#50fa7b">Signal</span>()
+		}
+	}
+
+	rf.heartbeatTimer.<span style="color:#50fa7b">Reset</span>(<span style="color:#50fa7b">StableHeartbeatTimeout</span>())
+}
+</code></pre></div><h3 id="handler-1">handler</h3>
+<p>完全按照论文图中伪代码实现，包括了课程视频中提到的加速解决日志冲突的优化。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#8be9fd;font-style:italic">func</span> (rf <span style="color:#ff79c6">*</span>Raft) <span style="color:#50fa7b">AppendEntries</span>(args <span style="color:#ff79c6">*</span>AppendEntriesArgs, reply <span style="color:#ff79c6">*</span>AppendEntriesReply) {
+	rf.rw.<span style="color:#50fa7b">Lock</span>()
+	<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[Server %d][term %d lastindex %d lastterm %d commit %d] receive AppendEntries %+v from %d&#34;</span>, rf.me, rf.currentTerm, rf.<span style="color:#50fa7b">getLastLogEntry</span>().Index, rf.<span style="color:#50fa7b">getLastLogEntry</span>().Term, rf.commitIndex, args, args.LeaderId)
+	<span style="color:#ff79c6">defer</span> rf.rw.<span style="color:#50fa7b">Unlock</span>()
+	<span style="color:#ff79c6">defer</span> <span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[Server %d] reply [%s] for AppendEntries to %d&#34;</span>, rf.me, reply, args.LeaderId)
+
+	needToPersist <span style="color:#ff79c6">:=</span> <span style="color:#ff79c6">false</span>
+	<span style="color:#ff79c6">if</span> args.Term &lt; rf.currentTerm {
+		reply.Success, reply.Term = <span style="color:#ff79c6">false</span>, rf.currentTerm
+		<span style="color:#ff79c6">return</span>
+	}
+
+	<span style="color:#ff79c6">if</span> args.Term &gt; rf.currentTerm {
+		rf.currentTerm = args.Term
+		needToPersist = <span style="color:#ff79c6">true</span>
+	}
+
+	rf.currentState = Follower
+	rf.electionTimer.<span style="color:#50fa7b">Reset</span>(<span style="color:#50fa7b">RandomizedElectionTimeout</span>())
+
+	<span style="color:#ff79c6">if</span> args.PrevLogIndex &lt; rf.<span style="color:#50fa7b">getDummyLogntry</span>().Index {
+		reply.Success, reply.Term = <span style="color:#ff79c6">false</span>, <span style="color:#bd93f9">0</span>
+		<span style="color:#ff79c6">if</span> needToPersist {
+			rf.<span style="color:#50fa7b">persist</span>()
+		}
+
+		<span style="color:#ff79c6">return</span>
+	}
+
+	<span style="color:#ff79c6">if</span> !rf.<span style="color:#50fa7b">isLogMatch</span>(args.PrevLogIndex, args.PrevLogTerm) {
+		reply.Term, reply.Success = rf.currentTerm, <span style="color:#ff79c6">false</span>
+		reply.XIndex, reply.Term = rf.<span style="color:#50fa7b">getConflictEntry</span>(args.PrevLogIndex)
+		<span style="color:#ff79c6">if</span> needToPersist {
+			rf.<span style="color:#50fa7b">persist</span>()
+		}
+
+		<span style="color:#ff79c6">return</span>
+	}
+
+	lastLogIndex <span style="color:#ff79c6">:=</span> rf.<span style="color:#50fa7b">getLastLogEntry</span>().Index
+	<span style="color:#ff79c6">for</span> index, entry <span style="color:#ff79c6">:=</span> <span style="color:#ff79c6">range</span> args.Entries {
+		<span style="color:#ff79c6">if</span> entry.Index &gt; lastLogIndex <span style="color:#ff79c6">||</span> rf.logs[rf.<span style="color:#50fa7b">getSliceIndex</span>(entry.Index)].Term <span style="color:#ff79c6">!=</span> entry.Term {
+			rf.logs = <span style="color:#8be9fd;font-style:italic">append</span>(rf.logs[:rf.<span style="color:#50fa7b">getSliceIndex</span>(entry.Index)], args.Entries[index:]<span style="color:#ff79c6">...</span>)
+			<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[Server %d] append Follower&#39;s last log index from %d to %d&#34;</span>, rf.me, lastLogIndex, rf.<span style="color:#50fa7b">getLastLogEntry</span>().Index)
+			needToPersist = <span style="color:#ff79c6">true</span>
+			<span style="color:#ff79c6">break</span>
+		}
+	}
+
+	rf.<span style="color:#50fa7b">maybeAdvanceFollowerCommit</span>(args.LeaderCommit)
+	reply.Success = <span style="color:#ff79c6">true</span>
+	<span style="color:#ff79c6">if</span> needToPersist {
+		rf.<span style="color:#50fa7b">persist</span>()
+	}
+}
+</code></pre></div><h2 id="persistence">persistence</h2>
+<p>论文中提到有三个变量是需要持久化的：currentTerm、votedFor、log[]，这三个量每次改变之后都应该持久化。</p>
+<p>持久化应当在被其他协程感知（发送RPC、释放锁）之前完成，而每个函数中如果没有改变这三个量（如加锁之后发现RPC过期）则不用持久化，若有也只需持久化一次，所以我在很多地方都使用了一个 needToPersist 布尔量进行判断。这样写感觉不够优雅，暂时没想到其他方法。</p>
+<h2 id="log-compaction">log-compaction</h2>
+<p>对于leader，在replicator中根据next index判断出需要给peer发送快照时，调用 <code>persister.ReadSnapshot</code> 获得快照并发送。</p>
+<p>对于接收方，需要判断如果 args.LastIncludedIndex &lt;= rf.commitIndex，则拒绝接收快照。这说明本地状态机已经至少比该快照更新（或者将要，因为applier协程已经在apply这些日志的过程中了），可能导致raft回到旧的状态。应当等待service层调用 <code>Snapshot</code> 函数来安装快照。接收快照后，异步写入到applyCh中。</p>
+<p>对于两个service层给raft层安装快照的函数，它们的区别是：<code>Snapshot</code> 是由service层在处理apply message时判断raft state&rsquo;s size是否达到阈值，主动调用。<code>CondInstallSnapshot</code> 是service层在处理apply message中leader发来的更新的快照时调用，也需要再次判断是否 LastIncludedIndex &lt;= rf.commitIndex，安装快照之后应该更新lastApplied、commitIndex。</p>
+<p>安装快照后需要压缩日志，但是需要记录下包含在快照中的最新的日志项的index和term，我将其记录在dummy entry（即rf.log[0]）中。此外被删除的日志项需要被正确的删除使其能够被gc。</p>
+<h2 id="applier">applier</h2>
+<p>根据论文，一旦commitIndex &gt; lastApplied，则需要将[lastApplied+1, commitIndex]中的所有日志项apply到状态机并增加lastApplied。</p>
+<p>一开始我的实现是每次commitIndex更新，都异步起一个协程将[lastApplied+1, commitIndex]间日志写入applyCh。但是因为写channel时不能持有锁，所以这个过程只能是：</p>
+<p>加锁 -&gt; 深拷贝日志项 -&gt; 释放锁 -&gt; 写channel -&gt; 加锁 -&gt; 更新lastApplied -&gt; 释放锁</p>
+<p>日志在push完之前不会更新lastApplied，这样容易造成相同的日志项被重复apply，存在资源浪费。所以这里也可以参考之前replicator的实现思路，后台起一个applier协程，平时调用一个条件变量的 <code>Wait</code> ，被 <code>Signal</code> 唤醒时将[lastApplied+1, commitIndex]中的所有日志项apply到状态机，每次更新commitIndex时调用 <code>Signal</code>。这样即能避免日志被重复apply，也完成了 apply 日志到状态机和 raft 提交新日志之间的解耦。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#8be9fd;font-style:italic">func</span> (rf <span style="color:#ff79c6">*</span>Raft) <span style="color:#50fa7b">applier</span>(applyCh <span style="color:#8be9fd;font-style:italic">chan</span> ApplyMsg) {
+	<span style="color:#ff79c6">for</span> !rf.<span style="color:#50fa7b">Killed</span>() {
+		rf.rw.<span style="color:#50fa7b">Lock</span>()
+		<span style="color:#ff79c6">for</span> !rf.<span style="color:#50fa7b">needToApply</span>() {
+			rf.applierCond.<span style="color:#50fa7b">Wait</span>()
+		}
+
+		lastApplied, commitIndex <span style="color:#ff79c6">:=</span> rf.lastApplied, rf.commitIndex
+		needToApply <span style="color:#ff79c6">:=</span> <span style="color:#50fa7b">DeepCopy</span>(rf.logs[rf.<span style="color:#50fa7b">getSliceIndex</span>(lastApplied<span style="color:#ff79c6">+</span><span style="color:#bd93f9">1</span>) : rf.<span style="color:#50fa7b">getSliceIndex</span>(commitIndex)<span style="color:#ff79c6">+</span><span style="color:#bd93f9">1</span>])
+
+		rf.rw.<span style="color:#50fa7b">Unlock</span>()
+		<span style="color:#ff79c6">for</span> _, entry <span style="color:#ff79c6">:=</span> <span style="color:#ff79c6">range</span> needToApply {
+			applyMsg <span style="color:#ff79c6">:=</span> ApplyMsg{
+				CommandValid:  <span style="color:#ff79c6">true</span>,
+				Command:       entry.Command,
+				CommandIndex:  entry.Index,
+				CommandTerm:   entry.Term,
+				RaftStateSize: rf.persister.<span style="color:#50fa7b">RaftStateSize</span>(),
+			}
+
+			applyCh <span style="color:#ff79c6">&lt;-</span> applyMsg
+			<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[Server %d] applied log [index %d] at term %d&#34;</span>, rf.me, entry.Index, entry.Term)
+		}
+
+		rf.rw.<span style="color:#50fa7b">Lock</span>()
+		<span style="color:#ff79c6">if</span> commitIndex &gt; rf.lastApplied {
+			rf.lastApplied = commitIndex
+		}
+
+		rf.rw.<span style="color:#50fa7b">Unlock</span>()
+	}
+}
+</code></pre></div><p>需要注意因为写channel时是不加锁的，而写channel是可能出现并发的，可能存在一种情况：applier在写入一批旧日志时，follower接受leader的 <code>InstallSnapshot</code> 之后将新的snapshot写入channel。此时channel的写入顺序可能是：旧日志1 -&gt; 新快照 -&gt; 旧日志2。</p>
+<p>service层读channel是线性的，在读出snapshot并调用 <code>CondInstallSnapshot</code> 后会更新raft层的lastApplied、commitIndex。因此在raft层apply完日志之后，重新获得锁去更新lastApplied时要注意不能回退，在这二者之间可能service层已经对更新的快照调用过 <code>CondInstallSnapshot</code> 了（新快照的 lastIncludeIndex 一定大于 commitIndex ）。</p>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E5%88%86%E5%B8%83%E5%BC%8F%E7%B3%BB%E7%BB%9F/">分布式系统</a>
+        
+    </section>
+
+
+    </footer>
+
+
+    
+</article>
+
+    
+
+    <aside class="related-contents--wrapper">
+    
+    
+        <h2 class="section-title">Related contents</h2>
+        <div class="related-contents">
+            <div class="flex article-list--tile">
+                
+                    
+<article class="">
+    <a href="/2022/raftkv/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">RaftKV</h2>
+        </div>
+    </a>
+</article>
+                
+                    
+<article class="">
+    <a href="/2022/mapreduce/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">MapReduce</h2>
+        </div>
+    </a>
+</article>
+                
+            </div>
+        </div>
+    
+</aside>
+
+     
+    
+        
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2022 Ziann Chen&#39;s blog
+    </section>
+    
+    <section class="powerby">
+        Built with <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> <br />
+        Theme <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.7.0">Stack</a></b> designed by <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a>
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.css"integrity="sha256-c0uckgykQ9v5k&#43;IqViZOZKc47Jn7KQil4/MP3ySA3F8="crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.css"integrity="sha256-SBLU4vv6CA6lHsZ1XyTdhyjJxCjPif/TRkjnsyGAGnE="crossorigin="anonymous"
+            >
+
+            </main>
+    
+        <aside class="sidebar right-sidebar sticky">
+            <section class="widget archives">
+                <div class="widget-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+                </div>
+                <h2 class="widget-title section-title">Table of contents</h2>
+                
+                <div class="widget--toc">
+                    <nav id="TableOfContents">
+  <ol>
+    <li><a href="#结构体">结构体</a></li>
+    <li><a href="#leader-election">leader-election</a>
+      <ol>
+        <li><a href="#sender">sender</a></li>
+        <li><a href="#handler">handler</a></li>
+      </ol>
+    </li>
+    <li><a href="#log-replication">log-replication</a>
+      <ol>
+        <li><a href="#replicator">replicator</a></li>
+        <li><a href="#handler-1">handler</a></li>
+      </ol>
+    </li>
+    <li><a href="#persistence">persistence</a></li>
+    <li><a href="#log-compaction">log-compaction</a></li>
+    <li><a href="#applier">applier</a></li>
+  </ol>
+</nav>
+                </div>
+            </section>
+        </aside>
+    
+
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.5/dist/vibrant.min.js"integrity="sha256-5NovOZc4iwiAWTYIFiIM7DxKUXKWvpVEuMEPLzcm5/g="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

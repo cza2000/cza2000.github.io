@@ -6,20 +6,600 @@
         <description>Recent content on Ziann Chen&#39;s blog</description>
         <generator>Hugo -- gohugo.io</generator>
         <language>zh-CN</language>
-        <lastBuildDate>Wed, 02 Feb 2022 21:24:15 +0800</lastBuildDate><atom:link href="https://cza2000.github.io/index.xml" rel="self" type="application/rss+xml" /><item>
-        <title>Test</title>
-        <link>https://cza2000.github.io/2022/test/</link>
-        <pubDate>Wed, 02 Feb 2022 21:24:15 +0800</pubDate>
+        <lastBuildDate>Thu, 03 Feb 2022 15:06:21 +0800</lastBuildDate><atom:link href="https://cza2000.github.io/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>RaftKV</title>
+        <link>https://cza2000.github.io/2022/raftkv/</link>
+        <pubDate>Thu, 03 Feb 2022 15:06:21 +0800</pubDate>
         
-        <guid>https://cza2000.github.io/2022/test/</guid>
+        <guid>https://cza2000.github.io/2022/raftkv/</guid>
+        <description>&lt;h1 id=&#34;lab3-kvraft&#34;&gt;Lab3: KVRaft&lt;/h1&gt;
+&lt;p&gt;lab链接 &lt;a class=&#34;link&#34; href=&#34;https://pdos.csail.mit.edu/6.824/labs/lab-kvraft.html&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;https://pdos.csail.mit.edu/6.824/labs/lab-kvraft.html&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;本次lab中我们需要使用lab2中实现的Raft库来构建一个可容错的 Key/Value 存储服务，要求其对外提供强一致性（&lt;code&gt;Strong consistency&lt;/code&gt;）。&lt;/p&gt;
+&lt;p&gt;这个KV存储服务支持Get/Put/Append三种客户端操作。客户端通过RPC与集群中的leader通信，leader接收到请求后将其包装在一条Raft日志中下放到Raft层进行共识，日志被apply后返回客户端结果。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a class=&#34;link&#34; href=&#34;#lab3-kvraft&#34; &gt;Lab3: KVRaft&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class=&#34;link&#34; href=&#34;#%e4%b8%80%e4%ba%9b%e6%80%9d%e8%80%83&#34; &gt;一些思考&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class=&#34;link&#34; href=&#34;#client&#34; &gt;client&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class=&#34;link&#34; href=&#34;#server&#34; &gt;server&lt;/a&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a class=&#34;link&#34; href=&#34;#state-machine&#34; &gt;state-machine&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class=&#34;link&#34; href=&#34;#rpc-handler&#34; &gt;RPC handler&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class=&#34;link&#34; href=&#34;#snapshot&#34; &gt;snapshot&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id=&#34;一些思考&#34;&gt;一些思考&lt;/h2&gt;
+&lt;p&gt;在PartA的描述中提到，leader在将一个请求下放到raft层之后，commit之前宕机，这时它无法回复Clerk。又或者是，这条日志成功commit，但返回的RPC丢失。Clerk在规定时间内没有收到结果，会向另一台主机（可能是新选出的leader）发送RPC，这条日志最终被commit之后又会被应用于状态机，从而状态机执行了两次相同的请求。&lt;/p&gt;
+&lt;p&gt;这要求我们能够判断重复的请求。因此每个请求都需要被唯一标识，请求中需要加上（ClientID, RequestID），Clerk每次请求成功之后自增RequestID。&lt;/p&gt;
+&lt;p&gt;我们还需要在遇到重复的请求时直接返回第一次请求时的结果，这需要我们保存每一个Clerk的最后一次请求的结果ClientID -&amp;gt; (RequestID, LastResponse)。只需要保存最后一次请求结果是因为如果服务端收到RequestID = x的RPC，说明这个Clerk已经收到了RequestID为[1, x-1]之间内的所有请求的结果，服务端如果再次收到这个RequestID在区间之内的请求说明该RPC过期，直接丢弃即可。&lt;/p&gt;
+&lt;h2 id=&#34;client&#34;&gt;client&lt;/h2&gt;
+&lt;p&gt;我将3种请求共用了一个RPC，简化了逻辑。&lt;/p&gt;
+&lt;p&gt;Clerk保存一个leaderID，请求失败了再换另一个server，请求成功了自增requestID。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; Clerk &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	servers []&lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;labrpc.ClientEnd
+	&lt;span style=&#34;color:#6272a4&#34;&gt;// You will have to modify this struct.
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	leaderID  &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	clientID  &lt;span style=&#34;color:#8be9fd&#34;&gt;int64&lt;/span&gt;
+	requestID &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+}
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (ck &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Clerk) &lt;span style=&#34;color:#50fa7b&#34;&gt;Get&lt;/span&gt;(key &lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;) &lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt; {
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; ck.&lt;span style=&#34;color:#50fa7b&#34;&gt;Command&lt;/span&gt;(key, &lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;&amp;#34;&lt;/span&gt;, OpGet)
+}
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (ck &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Clerk) &lt;span style=&#34;color:#50fa7b&#34;&gt;Put&lt;/span&gt;(key &lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;, value &lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;) {
+	ck.&lt;span style=&#34;color:#50fa7b&#34;&gt;Command&lt;/span&gt;(key, value, OpPut)
+}
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (ck &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Clerk) &lt;span style=&#34;color:#50fa7b&#34;&gt;Append&lt;/span&gt;(key &lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;, value &lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;) {
+	ck.&lt;span style=&#34;color:#50fa7b&#34;&gt;Command&lt;/span&gt;(key, value, OpAppend)
+}
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (ck &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Clerk) &lt;span style=&#34;color:#50fa7b&#34;&gt;Command&lt;/span&gt;(key, value &lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;, op Operation) &lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt; {
+	req &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;getCommandRequest&lt;/span&gt;(key, value, op, &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;int&lt;/span&gt;(ck.clientID), ck.requestID)	
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; {
+		resp &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; CommandResponse{}
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; !ck.servers[ck.leaderID].&lt;span style=&#34;color:#50fa7b&#34;&gt;Call&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;KVServer.Command&amp;#34;&lt;/span&gt;, &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;req, &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;resp) &lt;span style=&#34;color:#ff79c6&#34;&gt;||&lt;/span&gt; resp.Err &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; ErrWrongLeader &lt;span style=&#34;color:#ff79c6&#34;&gt;||&lt;/span&gt; resp.Err &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; ErrTimeout {		
+			ck.leaderID = (ck.leaderID &lt;span style=&#34;color:#ff79c6&#34;&gt;+&lt;/span&gt; &lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt;) &lt;span style=&#34;color:#ff79c6&#34;&gt;%&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;len&lt;/span&gt;(ck.servers)
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;continue&lt;/span&gt;
+		}
+
+		ck.requestID&lt;span style=&#34;color:#ff79c6&#34;&gt;++&lt;/span&gt;
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt;	resp.Value	
+	}
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h2 id=&#34;server&#34;&gt;server&lt;/h2&gt;
+&lt;p&gt;KVServer的结构体如下：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; KVServer &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	mu      sync.RWMutex
+	me      &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	rf      &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;raft.Raft
+	applyCh &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; raft.ApplyMsg
+	dead    &lt;span style=&#34;color:#8be9fd&#34;&gt;int32&lt;/span&gt; &lt;span style=&#34;color:#6272a4&#34;&gt;// set by Kill()
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;
+	maxraftstate &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt; &lt;span style=&#34;color:#6272a4&#34;&gt;// snapshot if log grows this big
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;
+	&lt;span style=&#34;color:#6272a4&#34;&gt;// Your definitions here.
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	persister        &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;raft.Persister
+	notifyChans      &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;]&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;CommandResponse
+	db               &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;]&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;
+	lastSessions     &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;]Session
+	lastAppliedIndex &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h3 id=&#34;state-machine&#34;&gt;state-machine&lt;/h3&gt;
+&lt;p&gt;本次lab中只需使用一个内存版本的 KV 状态机 map[string]string。&lt;/p&gt;
+&lt;h3 id=&#34;rpc-handler&#34;&gt;RPC handler&lt;/h3&gt;
+&lt;p&gt;客户端请求来临时，Server端会启动一个协程作为RPC handler来处理客户端请求，其中会调用 &lt;code&gt;Raft.Start&lt;/code&gt; 函数将请求下放到Raft层形成一条日志去做共识。在Raft层，每条被commit的日志会按照index的顺序写入applyCh中，上层必须也按index序从applyCh中读出日志并应用于状态机，这样才能保证不同节点上的数据一致。&lt;/p&gt;
+&lt;p&gt;这要求必须有一个单独的applier协程来循环读applyCh，并应用于状态机。由于来自不同客户端的请求是并发的，如果在RPC handler协程中直接读applyCh无法保证index序。返回给客户端的response要根据日志应用于状态机的结果来生成，这需要我们处理RPC handler和applier协程之间的通信问题。&lt;/p&gt;
+&lt;p&gt;自然想到使用channel来通信，使用一个 notifyChans map (log index -&amp;gt; response) 来记录每一个请求对应的channel。在RPC handler协程将日志下放到Raft层之后，在notifyChans中注册一个channel并阻塞读，applier协程读出日志，应用于状态机之后生成response写入这个channel。RPC handler协程在规定时间内读出结果则正常返回客户端，若超时则返回超时。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (kv &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;KVServer) &lt;span style=&#34;color:#50fa7b&#34;&gt;Command&lt;/span&gt;(req &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;CommandRequest, resp &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;CommandResponse) {
+	&lt;span style=&#34;color:#6272a4&#34;&gt;// Your code here.
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;RLock&lt;/span&gt;()
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;defer&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[KVServer %d] reply %+v for Request %+v&amp;#34;&lt;/span&gt;, kv.me, resp, req)
+
+	&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[KVServer %d] received Request %+v from Clerk&amp;#34;&lt;/span&gt;, kv.me, req)
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; req.Op &lt;span style=&#34;color:#ff79c6&#34;&gt;!=&lt;/span&gt; OpGet &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;isDuplicatedRequest&lt;/span&gt;(req.ClientID, req.RequestID) {
+		resp.Err = kv.lastSessions[req.ClientID].Err
+		kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;RUnlock&lt;/span&gt;()
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt;
+	}
+	kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;RUnlock&lt;/span&gt;()
+
+	index, _, isLeader &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;Start&lt;/span&gt;(&lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;req)
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; !isLeader {
+		resp.Err = ErrWrongLeader
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt;
+	}
+
+	&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[KVServer %d] add command into raft layer [index %d]&amp;#34;&lt;/span&gt;, kv.me, index)
+	kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;Lock&lt;/span&gt;()
+	ch &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;getNotifyChan&lt;/span&gt;(index)
+	kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;Unlock&lt;/span&gt;()
+
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;select&lt;/span&gt; {
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; result &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;ch:
+		resp.Value = result.Value
+		resp.Err = result.Err
+
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;time.&lt;span style=&#34;color:#50fa7b&#34;&gt;NewTimer&lt;/span&gt;(&lt;span style=&#34;color:#bd93f9&#34;&gt;500&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt; time.Millisecond).C:
+		resp.Err = ErrTimeout
+	}
+
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;go&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt;() {
+		kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;Lock&lt;/span&gt;()
+		kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;removeNotifyChan&lt;/span&gt;(index)
+		kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;Unlock&lt;/span&gt;()
+	}()
+}
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (kv &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;KVServer) &lt;span style=&#34;color:#50fa7b&#34;&gt;applier&lt;/span&gt;() {
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; !kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;killed&lt;/span&gt;() {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;select&lt;/span&gt; {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; applyMsg &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;kv.applyCh:
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; applyMsg.CommandValid {
+				command &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; applyMsg.Command.(CommandRequest)
+				
+				kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;Lock&lt;/span&gt;()
+				&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; applyMsg.CommandIndex &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;=&lt;/span&gt; kv.lastAppliedIndex {
+					&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[KVServer %d] discard out-of-date apply Msg in [index %d]&amp;#34;&lt;/span&gt;, kv.me, applyMsg.CommandIndex)
+					kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;Unlock&lt;/span&gt;()
+					&lt;span style=&#34;color:#ff79c6&#34;&gt;continue&lt;/span&gt;
+				}
+				
+				kv.lastAppliedIndex = applyMsg.CommandIndex
+				&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;var&lt;/span&gt; response &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;CommandResponse
+				&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; command.Op &lt;span style=&#34;color:#ff79c6&#34;&gt;!=&lt;/span&gt; OpGet &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;isDuplicatedRequest&lt;/span&gt;(command.ClientID, command.RequestID) {
+					&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[KVServer %d] received a duplicated command in [index %d]&amp;#34;&lt;/span&gt;, kv.me, applyMsg.CommandIndex)
+					response = kv.lastSessions[command.ClientID].CommandResponse
+				} &lt;span style=&#34;color:#ff79c6&#34;&gt;else&lt;/span&gt; {
+					response = kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;applyCommand&lt;/span&gt;(command)
+					&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; command.Op &lt;span style=&#34;color:#ff79c6&#34;&gt;!=&lt;/span&gt; OpGet {
+						kv.lastSessions[command.ClientID] = Session{
+							RequestID:       command.RequestID,
+							CommandResponse: response,
+						}
+					}
+				}
+
+				&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;needToSnapshot&lt;/span&gt;(applyMsg.RaftStateSize) {
+					&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[KVServer %d] reach maxraftstate, take a snapshot till [index %d]&amp;#34;&lt;/span&gt;, kv.me, applyMsg.CommandIndex)
+					kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;takeSnapshot&lt;/span&gt;(applyMsg.CommandIndex)
+				}
+
+				&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; currentTerm, isLeader &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;GetState&lt;/span&gt;(); currentTerm &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; applyMsg.CommandTerm &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; isLeader {
+					ch &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;getNotifyChan&lt;/span&gt;(applyMsg.CommandIndex)
+					ch &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt; response
+				}
+
+				kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;Unlock&lt;/span&gt;()
+			} &lt;span style=&#34;color:#ff79c6&#34;&gt;else&lt;/span&gt; {
+				kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;Lock&lt;/span&gt;()
+				&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[KVServer %d] received a snapshot from raft layer [index %d, term %d]&amp;#34;&lt;/span&gt;, kv.me, applyMsg.SnapshotIndex, applyMsg.SnapshotTerm)
+				&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; kv.rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;CondInstallSnapshot&lt;/span&gt;(applyMsg.SnapshotTerm, applyMsg.SnapshotIndex, applyMsg.Snapshot) {
+					kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;applySnapshotToService&lt;/span&gt;(applyMsg.Snapshot)
+					kv.lastAppliedIndex = applyMsg.SnapshotIndex
+				}
+				kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;Unlock&lt;/span&gt;()
+			}
+		}
+	}
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;有几点需要注意：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;apply日志时需要防止状态机回滚。在lab2中提到作为follower的节点可能收到leader的install snapshot，将snapshot写入applyCh中，此时读applyCh的顺序是：旧日志1 -&amp;gt; 新快照 -&amp;gt; 旧日志2。应用了新快照之后要避免再次应用旧日志，所以应用快照之后也要更新 lastAppliedIndex，应用日志时要先判断是否 applyMsg.CommandIndex &amp;lt;= kv.lastAppliedIndex。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;仅对leader的notifyChan进行通知。每个节点在读出日志后都要提交到状态机，且更新lastSessions。但只有leader需要将response写入notifyChan。leader可能会在提交日志后失去leader身份，所以在applier中写入response前要先判断。此时RPC handler协程就让其超时。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;客户端的非读请求需要两次去重。重复的请求到来时，之前相同的请求可能已经被应用于该节点的状态机，也可能其对应的日志还没被commit。因此需要在RPC handler中调用Start之前以及日志commit之后应用于状态机之前两次去重。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;leader在调用Start提交日志后去获取notifyChan来阻塞读 以及 applier 在commit日志并应用于状态机之后获取notifyChan来写入response 这二者之间顺序无法保证。因此channel容量设置为1，先获取channel的协程要负责创建channel，这个过程要加写锁。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (kv &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;KVServer) &lt;span style=&#34;color:#50fa7b&#34;&gt;getNotifyChan&lt;/span&gt;(index &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;) &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;CommandResponse {
+	ch, ok &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.notifyChans[index]
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; !ok {
+		ch &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;make&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;CommandResponse, &lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt;)
+		kv.notifyChans[index] = ch
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; ch
+	}
+
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; ch
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h3 id=&#34;snapshot&#34;&gt;snapshot&lt;/h3&gt;
+&lt;p&gt;part B中要求我们在raft state size达到阈值时给raft层下发快照。快照中不仅需要包含KV状态机，还需要包含lastSessions客户端请求去重表。由于快照是和lastIncludeIndex对应的，所以需要由applier协程在将对应的index的日志应用于状态机后继续阻塞的生成快照。&lt;/p&gt;
+</description>
+        </item>
+        <item>
+        <title>Raft</title>
+        <link>https://cza2000.github.io/2022/raft/</link>
+        <pubDate>Thu, 03 Feb 2022 15:04:30 +0800</pubDate>
+        
+        <guid>https://cza2000.github.io/2022/raft/</guid>
+        <description>&lt;h1 id=&#34;lab2-raft&#34;&gt;Lab2: Raft&lt;/h1&gt;
+&lt;p&gt;lab原链接 &lt;a class=&#34;link&#34; href=&#34;https://pdos.csail.mit.edu/6.824/labs/lab-raft.html&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;https://pdos.csail.mit.edu/6.824/labs/lab-raft.html&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;Raft是一种基于复制的状态机协议，通过在多个副本服务器上存储其状态（即数据）的完整副本来实现容错。&lt;/p&gt;
+&lt;p&gt;Raft将客户端请求组织成一个称为日志的序列，并通过复制确保所有副本服务器都看到相同的日志。每个副本按日志顺序执行客户端请求，并将它们应用于本地的状态机副本。由于所有副本服务器都看到相同的日志内容，因此它们都以相同的顺序执行相同的请求，从而继续具有相同的服务状态。如果服务器出现故障但随后恢复，Raft保证只要至少半数的服务器存活，并且可以相互通信，就可以保证正常对外服务。&lt;/p&gt;
+&lt;p&gt;在本次lab中我们的任务是使用go语言实现raft。参考论文 &lt;a class=&#34;link&#34; href=&#34;https://pdos.csail.mit.edu/6.824/papers/raft-extended.pdf&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;raft-extended&lt;/a&gt;，我们需要实现除了集群成员变更之外的绝大部分内容。论文中我认为最核心的就是描述3个RPC的(Figure 2)这张图，我的实现大体上遵循了这张图。此外我也参考了一些工业级的raft实现，比如SOFAJraft、etcd，做了一些优化。在我秋招面试美团的一个做分布式存储的部门时，他们问了我很多关于raft的内容（虽然最后挂了）。&lt;/p&gt;
+&lt;p&gt;有些需要注意的点：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;当收到的RPC中的term大于自身时，无条件跟随term并转为follower，这在不同的RPC handler中的处理略有不同。&lt;/li&gt;
+&lt;li&gt;在lab的一些测试用例中，网络将是不稳定的，带来大量随机的RPC丢包、乱序、超时。对于过期的RPC，直接抛弃不处理即可。对于是否过期的判断体现在term太小、身份不正确之类（例如follow收到append entries response）。&lt;/li&gt;
+&lt;li&gt;锁的使用：在接发RPC、读写channel时一定不要持有锁，不然很有可能死锁。此外有许多代码块对Raft结构中各字段是只读的，我使用了读写锁。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id=&#34;结构体&#34;&gt;结构体&lt;/h2&gt;
+&lt;p&gt;Raft结构中的各个变量和论文大致一样。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; Raft &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	rw        sync.RWMutex        &lt;span style=&#34;color:#6272a4&#34;&gt;// Lock to protect shared access to this peer&amp;#39;s state
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	peers     []&lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;labrpc.ClientEnd &lt;span style=&#34;color:#6272a4&#34;&gt;// RPC end points of all peers
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	persister &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Persister          &lt;span style=&#34;color:#6272a4&#34;&gt;// Object to hold this peer&amp;#39;s persisted state
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	me        &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;                 &lt;span style=&#34;color:#6272a4&#34;&gt;// this peer&amp;#39;s index into peers[]
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	dead      &lt;span style=&#34;color:#8be9fd&#34;&gt;int32&lt;/span&gt;               &lt;span style=&#34;color:#6272a4&#34;&gt;// set by Kill()
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	&lt;span style=&#34;color:#6272a4&#34;&gt;// Your data here (2A, 2B, 2C).
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	&lt;span style=&#34;color:#6272a4&#34;&gt;// Look at the paper&amp;#39;s Figure 2 for a description of what
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	&lt;span style=&#34;color:#6272a4&#34;&gt;// state a Raft server must maintain.
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;
+	currentState   State
+	currentTerm    &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	votedFor       &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	voteFrom       &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;]&lt;span style=&#34;color:#8be9fd&#34;&gt;bool&lt;/span&gt;
+	logs           []LogEntry
+	commitIndex    &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	lastApplied    &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	nextIndex      []&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	matchIndex     []&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	electionTimer  &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;time.Timer
+	heartbeatTimer &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;time.Timer
+	applyCh        &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; ApplyMsg
+	applierCond    sync.Cond
+	replicatorCond []sync.Cond
+}
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;Make&lt;/span&gt;(peers []&lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;labrpc.ClientEnd, me &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;,
+	persister &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Persister, applyCh &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; ApplyMsg) &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Raft {
+	&lt;span style=&#34;color:#6272a4&#34;&gt;// Your initialization code here (2A, 2B, 2C).
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	rf &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;Raft{
+		rw:             sync.RWMutex{},
+		peers:          peers,
+		persister:      persister,
+		me:             me,
+		dead:           &lt;span style=&#34;color:#ff79c6&#34;&gt;-&lt;/span&gt;&lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt;,
+		currentState:   Follower,
+		currentTerm:    &lt;span style=&#34;color:#bd93f9&#34;&gt;0&lt;/span&gt;,
+		votedFor:       &lt;span style=&#34;color:#ff79c6&#34;&gt;-&lt;/span&gt;&lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt;,
+		voteFrom:       &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;make&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;]&lt;span style=&#34;color:#8be9fd&#34;&gt;bool&lt;/span&gt;),
+		logs:           &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;make&lt;/span&gt;([]LogEntry, &lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt;),
+		nextIndex:      &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;make&lt;/span&gt;([]&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;, &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;len&lt;/span&gt;(peers)),
+		matchIndex:     &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;make&lt;/span&gt;([]&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;, &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;len&lt;/span&gt;(peers)),
+		electionTimer:  time.&lt;span style=&#34;color:#50fa7b&#34;&gt;NewTimer&lt;/span&gt;(&lt;span style=&#34;color:#50fa7b&#34;&gt;RandomizedElectionTimeout&lt;/span&gt;()),
+		heartbeatTimer: time.&lt;span style=&#34;color:#50fa7b&#34;&gt;NewTimer&lt;/span&gt;(&lt;span style=&#34;color:#50fa7b&#34;&gt;StableHeartbeatTimeout&lt;/span&gt;()),
+		applyCh:        applyCh,
+		replicatorCond: &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;make&lt;/span&gt;([]sync.Cond, &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;len&lt;/span&gt;(peers)),
+	}
+
+	rf.applierCond = &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;sync.&lt;span style=&#34;color:#50fa7b&#34;&gt;NewCond&lt;/span&gt;(&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;rf.rw)
+	rf.logs[&lt;span style=&#34;color:#bd93f9&#34;&gt;0&lt;/span&gt;] = LogEntry{&lt;span style=&#34;color:#bd93f9&#34;&gt;0&lt;/span&gt;, &lt;span style=&#34;color:#bd93f9&#34;&gt;0&lt;/span&gt;, &lt;span style=&#34;color:#ff79c6&#34;&gt;nil&lt;/span&gt;}
+	&lt;span style=&#34;color:#6272a4&#34;&gt;// initialize from state persisted before a crash
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;readPersist&lt;/span&gt;(persister.&lt;span style=&#34;color:#50fa7b&#34;&gt;ReadRaftState&lt;/span&gt;())
+	rf.commitIndex, rf.lastApplied = rf.logs[&lt;span style=&#34;color:#bd93f9&#34;&gt;0&lt;/span&gt;].Index, rf.logs[&lt;span style=&#34;color:#bd93f9&#34;&gt;0&lt;/span&gt;].Index
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; i &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#bd93f9&#34;&gt;0&lt;/span&gt;; i &amp;lt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;len&lt;/span&gt;(peers); i&lt;span style=&#34;color:#ff79c6&#34;&gt;++&lt;/span&gt; {
+		rf.matchIndex[i], rf.nextIndex[i] = &lt;span style=&#34;color:#bd93f9&#34;&gt;0&lt;/span&gt;, rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;getLastLogEntry&lt;/span&gt;().Index&lt;span style=&#34;color:#ff79c6&#34;&gt;+&lt;/span&gt;&lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt;
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; i &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; me {
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;continue&lt;/span&gt;
+		}
+
+		rf.replicatorCond[i] = &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;sync.&lt;span style=&#34;color:#50fa7b&#34;&gt;NewCond&lt;/span&gt;(&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;sync.Mutex{})
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;go&lt;/span&gt; rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;replicator&lt;/span&gt;(i)
+	}
+
+	&lt;span style=&#34;color:#6272a4&#34;&gt;// start ticker goroutine to start elections
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	&lt;span style=&#34;color:#ff79c6&#34;&gt;go&lt;/span&gt; rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;ticker&lt;/span&gt;()
+
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;go&lt;/span&gt; rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;applier&lt;/span&gt;(rf.applyCh)
+
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; rf
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;根据论文，日志的index和term都从1开始，所以在logs[0]处存放一个index和term均为0的dummy value。&lt;/p&gt;
+&lt;p&gt;在Make函数中启动了一些后台协程&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;replicator：共len(peers)-1个，用于管理leader对每一个follower的日志复制，下文会详细介绍。&lt;/li&gt;
+&lt;li&gt;ticker：用来触发选举和心跳timeout。&lt;/li&gt;
+&lt;li&gt;applier：用于向applyCh中提交已经commit的日志。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id=&#34;leader-election&#34;&gt;leader-election&lt;/h2&gt;
+&lt;h3 id=&#34;sender&#34;&gt;sender&lt;/h3&gt;
+&lt;p&gt;在ticker函数中需要循环使用select监听两个timer的channel，lab的提示中说使用timer可能会有问题但我没有遇到过，懒得改了。&lt;/p&gt;
+&lt;p&gt;如果是选举计时器到期，则发起一轮选举；如果是心跳计时器到期，则发起一轮心跳。二者都要首先判断当前身份是否正确。我使用了一个map来记录当前term中投票给自己的peer，需要在每次转换为candidate时清空map。也可以每次start election时声明一个得票计数，之后使用闭包来计算。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (rf &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Raft) &lt;span style=&#34;color:#50fa7b&#34;&gt;ticker&lt;/span&gt;() {
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; !rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;Killed&lt;/span&gt;() {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;select&lt;/span&gt; {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;rf.electionTimer.C:
+			rf.rw.&lt;span style=&#34;color:#50fa7b&#34;&gt;Lock&lt;/span&gt;()
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; rf.currentState &lt;span style=&#34;color:#ff79c6&#34;&gt;!=&lt;/span&gt; Leader {
+				rf.currentState = Candidate
+				rf.voteFrom = &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;make&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;]&lt;span style=&#34;color:#8be9fd&#34;&gt;bool&lt;/span&gt;)
+				rf.currentTerm&lt;span style=&#34;color:#ff79c6&#34;&gt;++&lt;/span&gt;
+				rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;startElection&lt;/span&gt;()
+			}
+
+			rf.electionTimer.&lt;span style=&#34;color:#50fa7b&#34;&gt;Reset&lt;/span&gt;(&lt;span style=&#34;color:#50fa7b&#34;&gt;RandomizedElectionTimeout&lt;/span&gt;())
+			rf.rw.&lt;span style=&#34;color:#50fa7b&#34;&gt;Unlock&lt;/span&gt;()
+
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;rf.heartbeatTimer.C:
+			rf.rw.&lt;span style=&#34;color:#50fa7b&#34;&gt;Lock&lt;/span&gt;()
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; rf.currentState &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; Leader {
+				&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Server %d] boardcast heartbeat at term %d&amp;#34;&lt;/span&gt;, rf.me, rf.currentTerm)
+				rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;boardcastHeartbeat&lt;/span&gt;(&lt;span style=&#34;color:#ff79c6&#34;&gt;true&lt;/span&gt;)
+			}
+
+			rf.rw.&lt;span style=&#34;color:#50fa7b&#34;&gt;Unlock&lt;/span&gt;()
+		}
+	}
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;选举需要异步对每个peer发送request vote，不然就太慢了。异步才不会阻塞ticker，能快速重置计时器。response handler中要先判断是否仍满足rf.currentTerm == args.Term &amp;amp;&amp;amp; rf.currentState == Candidate，若不满足说明RPC过期，直接抛弃不处理。&lt;/p&gt;
+&lt;p&gt;我之所以没有使用闭包是因为这样难以抽象出一个 handleRequestVoteResponse 函数，代码结构不够统一。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (rf &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Raft) &lt;span style=&#34;color:#50fa7b&#34;&gt;startElection&lt;/span&gt;() {
+	args &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;getDefaultRequestVoteArgs&lt;/span&gt;()
+	rf.votedFor, rf.voteFrom[rf.me] = rf.me, &lt;span style=&#34;color:#ff79c6&#34;&gt;true&lt;/span&gt;
+	rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;persist&lt;/span&gt;()
+	&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Server %d] start election at term %d&amp;#34;&lt;/span&gt;, rf.me, rf.currentTerm)
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; index &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;range&lt;/span&gt; rf.peers {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; index &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; rf.me {
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;continue&lt;/span&gt;
+		}
+
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;go&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt;(i &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;) {
+			reply &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; RequestVoteReply{}
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;sendRequestVote&lt;/span&gt;(i, &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;args, &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;reply) {
+				rf.rw.&lt;span style=&#34;color:#50fa7b&#34;&gt;Lock&lt;/span&gt;()
+				rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;handleRequestVoteResponse&lt;/span&gt;(i, &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;args, &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;reply)
+				rf.rw.&lt;span style=&#34;color:#50fa7b&#34;&gt;Unlock&lt;/span&gt;()
+			}
+		}(index)
+	}
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h3 id=&#34;handler&#34;&gt;handler&lt;/h3&gt;
+&lt;p&gt;handler的实现完全参照论文，先判断term是否小于自身，再判断term、voteFor和日志是否满足条件。判断voteFor时要先满足args.Term == rf.currentTerm，这是由于args.Term &amp;gt; rf.currentTerm时需要无条件跟随term并重置voteFor。&lt;/p&gt;
+&lt;p&gt;需要注意的是只有同意投票时才需要重置election timer，这在课程的TA的guidance中有提及，有利于在网络不稳定时仍能快速选出leader。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (rf &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Raft) &lt;span style=&#34;color:#50fa7b&#34;&gt;RequestVote&lt;/span&gt;(args &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;RequestVoteArgs, reply &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;RequestVoteReply) {
+	&lt;span style=&#34;color:#6272a4&#34;&gt;// Your code here (2A, 2B).
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	&lt;span style=&#34;color:#ff79c6&#34;&gt;defer&lt;/span&gt; rf.rw.&lt;span style=&#34;color:#50fa7b&#34;&gt;Unlock&lt;/span&gt;()
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;defer&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Server %d] reply [%s] for RequestVote to %d&amp;#34;&lt;/span&gt;, rf.me, reply, args.CandidateId)
+
+	rf.rw.&lt;span style=&#34;color:#50fa7b&#34;&gt;Lock&lt;/span&gt;()
+	&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Server %d][state %s term %d vote %d lastindex %d lastterm %d] receive RequestVote [%s] from %d&amp;#34;&lt;/span&gt;, rf.me, StateName[rf.currentState], rf.currentTerm, rf.votedFor, rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;getLastLogEntry&lt;/span&gt;().Index, rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;getLastLogEntry&lt;/span&gt;().Term, args, args.CandidateId)
+
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; args.Term &amp;lt; rf.currentTerm &lt;span style=&#34;color:#ff79c6&#34;&gt;||&lt;/span&gt; (args.Term &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; rf.currentTerm &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; rf.votedFor &lt;span style=&#34;color:#ff79c6&#34;&gt;!=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;-&lt;/span&gt;&lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; rf.votedFor &lt;span style=&#34;color:#ff79c6&#34;&gt;!=&lt;/span&gt; args.CandidateId) {
+		reply.Term, reply.VoteGranted = rf.currentTerm, &lt;span style=&#34;color:#ff79c6&#34;&gt;false&lt;/span&gt;
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt;
+	}
+
+	needToPersist &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;false&lt;/span&gt;
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; args.Term &amp;gt; rf.currentTerm {
+		rf.currentTerm, rf.votedFor = args.Term, &lt;span style=&#34;color:#ff79c6&#34;&gt;-&lt;/span&gt;&lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt;
+		&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Server %d] change state from Leader to Follower at term %d&amp;#34;&lt;/span&gt;, rf.me, rf.currentTerm)
+		rf.currentState = Follower
+		needToPersist = &lt;span style=&#34;color:#ff79c6&#34;&gt;true&lt;/span&gt;
+	}
+
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; !rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;isLogUpToDate&lt;/span&gt;(args.LastLogIndex, args.LastLogTerm) {
+		reply.Term, reply.VoteGranted = rf.currentTerm, &lt;span style=&#34;color:#ff79c6&#34;&gt;false&lt;/span&gt;
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; needToPersist {
+			rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;persist&lt;/span&gt;()
+		}
+
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt;
+	}
+
+	reply.Term, reply.VoteGranted = rf.currentTerm, &lt;span style=&#34;color:#ff79c6&#34;&gt;true&lt;/span&gt;
+	rf.votedFor = args.CandidateId
+	rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;persist&lt;/span&gt;()
+	rf.electionTimer.&lt;span style=&#34;color:#50fa7b&#34;&gt;Reset&lt;/span&gt;(&lt;span style=&#34;color:#50fa7b&#34;&gt;RandomizedElectionTimeout&lt;/span&gt;())
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h2 id=&#34;log-replication&#34;&gt;log-replication&lt;/h2&gt;
+&lt;h3 id=&#34;replicator&#34;&gt;replicator&lt;/h3&gt;
+&lt;p&gt;根据每个peer的nextIndex判断发送entries或是snapshot。&lt;/p&gt;
+&lt;p&gt;response handler的实现参照论文，先判断是否过期，再判断是否成功。若成功，则更新match、next index。找到最新的复制到超过半数peer且term等于当前term的日志，更新commit。需要注意日志的term必须和当前term一致才能更新commit，不然可能会有安全性问题导致已经commit的日志被覆盖，我忘了哪个测试一直过不了后来发现就是这个原因，所以论文一定要非常仔细读。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (rf &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Raft) &lt;span style=&#34;color:#50fa7b&#34;&gt;doReplicate&lt;/span&gt;(i &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;) {
+	rf.rw.&lt;span style=&#34;color:#50fa7b&#34;&gt;RLock&lt;/span&gt;()
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; rf.currentState &lt;span style=&#34;color:#ff79c6&#34;&gt;!=&lt;/span&gt; Leader {
+		rf.rw.&lt;span style=&#34;color:#50fa7b&#34;&gt;RUnlock&lt;/span&gt;()
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt;
+	}
+
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; rf.nextIndex[i] &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;=&lt;/span&gt; rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;getDummyLogntry&lt;/span&gt;().Index {
+		args &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;getDefaultInstallSnapshotArgs&lt;/span&gt;()
+		rf.rw.&lt;span style=&#34;color:#50fa7b&#34;&gt;RUnlock&lt;/span&gt;()
+
+		reply &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; InstallSnapshotReply{}
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;sendInstallSnapshot&lt;/span&gt;(i, &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;args, &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;reply) {
+			rf.rw.&lt;span style=&#34;color:#50fa7b&#34;&gt;Lock&lt;/span&gt;()
+			rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;handleInstallSnapshotResponse&lt;/span&gt;(i, args, reply)
+			rf.rw.&lt;span style=&#34;color:#50fa7b&#34;&gt;Unlock&lt;/span&gt;()
+		}
+	} &lt;span style=&#34;color:#ff79c6&#34;&gt;else&lt;/span&gt; {
+		args &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;getDefaultAppendEntriesArgs&lt;/span&gt;(i)
+		rf.rw.&lt;span style=&#34;color:#50fa7b&#34;&gt;RUnlock&lt;/span&gt;()
+
+		reply &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; AppendEntriesReply{}
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;sendAppendEntries&lt;/span&gt;(i, &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;args, &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;reply) {
+			rf.rw.&lt;span style=&#34;color:#50fa7b&#34;&gt;Lock&lt;/span&gt;()
+			rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;handleAppendEntriesReponse&lt;/span&gt;(i, &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;args, &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;reply)
+			rf.rw.&lt;span style=&#34;color:#50fa7b&#34;&gt;Unlock&lt;/span&gt;()
+		}
+	}
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;这里我参考了 &lt;a class=&#34;link&#34; href=&#34;https://github.com/LebronAl/MIT6.824-2021/blob/master/docs/lab2.md#%E5%A4%8D%E5%88%B6%E6%A8%A1%E5%9E%8B&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;LebronAI&lt;/a&gt; 的设计。&lt;/p&gt;
+&lt;p&gt;如果为每一次Start、心跳都广播发送一次append entries，则将下层的日志同步与上层的提交新指令强绑定了，会造成RPC数量过多，还会重复发送很多次相同的日志项。每次发送 rpc 都不论是发送端还是接收端都需要若干次系统调用和内存拷贝，rpc 次数过多也会对 CPU 造成不必要的压力。&lt;/p&gt;
+&lt;p&gt;这里可以做一个batching的优化，也将二者之间解耦。这里原作者参考了SOFAJraft的日志复制模型，让每个peer对于其他所有peer各维护一个replicator协程，负责在自己成为leader时对单独一个peer的日志复制。&lt;/p&gt;
+&lt;p&gt;这个协程利用条件变量 &lt;code&gt;sync.Cond&lt;/code&gt; 执行 &lt;code&gt;Wait&lt;/code&gt; 来避免耗费 cpu，每次需要进行一次日志复制时调用 &lt;code&gt;Signal&lt;/code&gt; 唤醒。它在满足复制条件时会尽最大努力将[nextIndex, lastIndex]之间的日志复制到peer上。&lt;/p&gt;
+&lt;p&gt;由于leader使用replicator维护对于一个peer的日志复制，同一时间下最多只会发送一个RPC，若RPC丢失、超时很可能触发re-election。因此：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;心跳计时器到期，很急，要立即发送RPC。leader commit更新时也要立即发送RPC，这个是为啥我忘记了。&lt;/li&gt;
+&lt;li&gt;Start被调用，不急，只需调用条件变量的 &lt;code&gt;Singal&lt;/code&gt;，让replicator慢慢发。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (rf &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Raft) &lt;span style=&#34;color:#50fa7b&#34;&gt;replicator&lt;/span&gt;(peer &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;) {
+	rf.replicatorCond[peer].L.&lt;span style=&#34;color:#50fa7b&#34;&gt;Lock&lt;/span&gt;()
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;defer&lt;/span&gt; rf.replicatorCond[peer].L.&lt;span style=&#34;color:#50fa7b&#34;&gt;Unlock&lt;/span&gt;()
+
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; !rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;Killed&lt;/span&gt;() {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; !rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;needToReplicate&lt;/span&gt;(peer) {
+			rf.replicatorCond[peer].&lt;span style=&#34;color:#50fa7b&#34;&gt;Wait&lt;/span&gt;()
+		}
+
+		rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;doReplicate&lt;/span&gt;(peer)
+	}
+}
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (rf &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Raft) &lt;span style=&#34;color:#50fa7b&#34;&gt;needToReplicate&lt;/span&gt;(peer &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;) &lt;span style=&#34;color:#8be9fd&#34;&gt;bool&lt;/span&gt; {
+	rf.rw.&lt;span style=&#34;color:#50fa7b&#34;&gt;RLock&lt;/span&gt;()
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;defer&lt;/span&gt; rf.rw.&lt;span style=&#34;color:#50fa7b&#34;&gt;RUnlock&lt;/span&gt;()
+
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; rf.currentState &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; Leader &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; rf.nextIndex[peer] &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;=&lt;/span&gt; rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;getLastLogEntry&lt;/span&gt;().Index
+}
+ 
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (rf &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Raft) &lt;span style=&#34;color:#50fa7b&#34;&gt;boardcastHeartbeat&lt;/span&gt;(isHeartbeat &lt;span style=&#34;color:#8be9fd&#34;&gt;bool&lt;/span&gt;) {
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; index &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;range&lt;/span&gt; rf.peers {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; index &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; rf.me {
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;continue&lt;/span&gt;
+		}
+
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; isHeartbeat {
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;go&lt;/span&gt; rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;doReplicate&lt;/span&gt;(index)
+		} &lt;span style=&#34;color:#ff79c6&#34;&gt;else&lt;/span&gt; {
+			rf.replicatorCond[index].&lt;span style=&#34;color:#50fa7b&#34;&gt;Signal&lt;/span&gt;()
+		}
+	}
+
+	rf.heartbeatTimer.&lt;span style=&#34;color:#50fa7b&#34;&gt;Reset&lt;/span&gt;(&lt;span style=&#34;color:#50fa7b&#34;&gt;StableHeartbeatTimeout&lt;/span&gt;())
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h3 id=&#34;handler-1&#34;&gt;handler&lt;/h3&gt;
+&lt;p&gt;完全按照论文图中伪代码实现，包括了课程视频中提到的加速解决日志冲突的优化。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (rf &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Raft) &lt;span style=&#34;color:#50fa7b&#34;&gt;AppendEntries&lt;/span&gt;(args &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;AppendEntriesArgs, reply &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;AppendEntriesReply) {
+	rf.rw.&lt;span style=&#34;color:#50fa7b&#34;&gt;Lock&lt;/span&gt;()
+	&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Server %d][term %d lastindex %d lastterm %d commit %d] receive AppendEntries %+v from %d&amp;#34;&lt;/span&gt;, rf.me, rf.currentTerm, rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;getLastLogEntry&lt;/span&gt;().Index, rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;getLastLogEntry&lt;/span&gt;().Term, rf.commitIndex, args, args.LeaderId)
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;defer&lt;/span&gt; rf.rw.&lt;span style=&#34;color:#50fa7b&#34;&gt;Unlock&lt;/span&gt;()
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;defer&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Server %d] reply [%s] for AppendEntries to %d&amp;#34;&lt;/span&gt;, rf.me, reply, args.LeaderId)
+
+	needToPersist &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;false&lt;/span&gt;
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; args.Term &amp;lt; rf.currentTerm {
+		reply.Success, reply.Term = &lt;span style=&#34;color:#ff79c6&#34;&gt;false&lt;/span&gt;, rf.currentTerm
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt;
+	}
+
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; args.Term &amp;gt; rf.currentTerm {
+		rf.currentTerm = args.Term
+		needToPersist = &lt;span style=&#34;color:#ff79c6&#34;&gt;true&lt;/span&gt;
+	}
+
+	rf.currentState = Follower
+	rf.electionTimer.&lt;span style=&#34;color:#50fa7b&#34;&gt;Reset&lt;/span&gt;(&lt;span style=&#34;color:#50fa7b&#34;&gt;RandomizedElectionTimeout&lt;/span&gt;())
+
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; args.PrevLogIndex &amp;lt; rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;getDummyLogntry&lt;/span&gt;().Index {
+		reply.Success, reply.Term = &lt;span style=&#34;color:#ff79c6&#34;&gt;false&lt;/span&gt;, &lt;span style=&#34;color:#bd93f9&#34;&gt;0&lt;/span&gt;
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; needToPersist {
+			rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;persist&lt;/span&gt;()
+		}
+
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt;
+	}
+
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; !rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;isLogMatch&lt;/span&gt;(args.PrevLogIndex, args.PrevLogTerm) {
+		reply.Term, reply.Success = rf.currentTerm, &lt;span style=&#34;color:#ff79c6&#34;&gt;false&lt;/span&gt;
+		reply.XIndex, reply.Term = rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;getConflictEntry&lt;/span&gt;(args.PrevLogIndex)
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; needToPersist {
+			rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;persist&lt;/span&gt;()
+		}
+
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt;
+	}
+
+	lastLogIndex &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;getLastLogEntry&lt;/span&gt;().Index
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; index, entry &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;range&lt;/span&gt; args.Entries {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; entry.Index &amp;gt; lastLogIndex &lt;span style=&#34;color:#ff79c6&#34;&gt;||&lt;/span&gt; rf.logs[rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;getSliceIndex&lt;/span&gt;(entry.Index)].Term &lt;span style=&#34;color:#ff79c6&#34;&gt;!=&lt;/span&gt; entry.Term {
+			rf.logs = &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;append&lt;/span&gt;(rf.logs[:rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;getSliceIndex&lt;/span&gt;(entry.Index)], args.Entries[index:]&lt;span style=&#34;color:#ff79c6&#34;&gt;...&lt;/span&gt;)
+			&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Server %d] append Follower&amp;#39;s last log index from %d to %d&amp;#34;&lt;/span&gt;, rf.me, lastLogIndex, rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;getLastLogEntry&lt;/span&gt;().Index)
+			needToPersist = &lt;span style=&#34;color:#ff79c6&#34;&gt;true&lt;/span&gt;
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;break&lt;/span&gt;
+		}
+	}
+
+	rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;maybeAdvanceFollowerCommit&lt;/span&gt;(args.LeaderCommit)
+	reply.Success = &lt;span style=&#34;color:#ff79c6&#34;&gt;true&lt;/span&gt;
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; needToPersist {
+		rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;persist&lt;/span&gt;()
+	}
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h2 id=&#34;persistence&#34;&gt;persistence&lt;/h2&gt;
+&lt;p&gt;论文中提到有三个变量是需要持久化的：currentTerm、votedFor、log[]，这三个量每次改变之后都应该持久化。&lt;/p&gt;
+&lt;p&gt;持久化应当在被其他协程感知（发送RPC、释放锁）之前完成，而每个函数中如果没有改变这三个量（如加锁之后发现RPC过期）则不用持久化，若有也只需持久化一次，所以我在很多地方都使用了一个 needToPersist 布尔量进行判断。这样写感觉不够优雅，暂时没想到其他方法。&lt;/p&gt;
+&lt;h2 id=&#34;log-compaction&#34;&gt;log-compaction&lt;/h2&gt;
+&lt;p&gt;对于leader，在replicator中根据next index判断出需要给peer发送快照时，调用 &lt;code&gt;persister.ReadSnapshot&lt;/code&gt; 获得快照并发送。&lt;/p&gt;
+&lt;p&gt;对于接收方，需要判断如果 args.LastIncludedIndex &amp;lt;= rf.commitIndex，则拒绝接收快照。这说明本地状态机已经至少比该快照更新（或者将要，因为applier协程已经在apply这些日志的过程中了），可能导致raft回到旧的状态。应当等待service层调用 &lt;code&gt;Snapshot&lt;/code&gt; 函数来安装快照。接收快照后，异步写入到applyCh中。&lt;/p&gt;
+&lt;p&gt;对于两个service层给raft层安装快照的函数，它们的区别是：&lt;code&gt;Snapshot&lt;/code&gt; 是由service层在处理apply message时判断raft state&amp;rsquo;s size是否达到阈值，主动调用。&lt;code&gt;CondInstallSnapshot&lt;/code&gt; 是service层在处理apply message中leader发来的更新的快照时调用，也需要再次判断是否 LastIncludedIndex &amp;lt;= rf.commitIndex，安装快照之后应该更新lastApplied、commitIndex。&lt;/p&gt;
+&lt;p&gt;安装快照后需要压缩日志，但是需要记录下包含在快照中的最新的日志项的index和term，我将其记录在dummy entry（即rf.log[0]）中。此外被删除的日志项需要被正确的删除使其能够被gc。&lt;/p&gt;
+&lt;h2 id=&#34;applier&#34;&gt;applier&lt;/h2&gt;
+&lt;p&gt;根据论文，一旦commitIndex &amp;gt; lastApplied，则需要将[lastApplied+1, commitIndex]中的所有日志项apply到状态机并增加lastApplied。&lt;/p&gt;
+&lt;p&gt;一开始我的实现是每次commitIndex更新，都异步起一个协程将[lastApplied+1, commitIndex]间日志写入applyCh。但是因为写channel时不能持有锁，所以这个过程只能是：&lt;/p&gt;
+&lt;p&gt;加锁 -&amp;gt; 深拷贝日志项 -&amp;gt; 释放锁 -&amp;gt; 写channel -&amp;gt; 加锁 -&amp;gt; 更新lastApplied -&amp;gt; 释放锁&lt;/p&gt;
+&lt;p&gt;日志在push完之前不会更新lastApplied，这样容易造成相同的日志项被重复apply，存在资源浪费。所以这里也可以参考之前replicator的实现思路，后台起一个applier协程，平时调用一个条件变量的 &lt;code&gt;Wait&lt;/code&gt; ，被 &lt;code&gt;Signal&lt;/code&gt; 唤醒时将[lastApplied+1, commitIndex]中的所有日志项apply到状态机，每次更新commitIndex时调用 &lt;code&gt;Signal&lt;/code&gt;。这样即能避免日志被重复apply，也完成了 apply 日志到状态机和 raft 提交新日志之间的解耦。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (rf &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Raft) &lt;span style=&#34;color:#50fa7b&#34;&gt;applier&lt;/span&gt;(applyCh &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; ApplyMsg) {
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; !rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;Killed&lt;/span&gt;() {
+		rf.rw.&lt;span style=&#34;color:#50fa7b&#34;&gt;Lock&lt;/span&gt;()
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; !rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;needToApply&lt;/span&gt;() {
+			rf.applierCond.&lt;span style=&#34;color:#50fa7b&#34;&gt;Wait&lt;/span&gt;()
+		}
+
+		lastApplied, commitIndex &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; rf.lastApplied, rf.commitIndex
+		needToApply &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;DeepCopy&lt;/span&gt;(rf.logs[rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;getSliceIndex&lt;/span&gt;(lastApplied&lt;span style=&#34;color:#ff79c6&#34;&gt;+&lt;/span&gt;&lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt;) : rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;getSliceIndex&lt;/span&gt;(commitIndex)&lt;span style=&#34;color:#ff79c6&#34;&gt;+&lt;/span&gt;&lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt;])
+
+		rf.rw.&lt;span style=&#34;color:#50fa7b&#34;&gt;Unlock&lt;/span&gt;()
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; _, entry &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;range&lt;/span&gt; needToApply {
+			applyMsg &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; ApplyMsg{
+				CommandValid:  &lt;span style=&#34;color:#ff79c6&#34;&gt;true&lt;/span&gt;,
+				Command:       entry.Command,
+				CommandIndex:  entry.Index,
+				CommandTerm:   entry.Term,
+				RaftStateSize: rf.persister.&lt;span style=&#34;color:#50fa7b&#34;&gt;RaftStateSize&lt;/span&gt;(),
+			}
+
+			applyCh &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt; applyMsg
+			&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Server %d] applied log [index %d] at term %d&amp;#34;&lt;/span&gt;, rf.me, entry.Index, entry.Term)
+		}
+
+		rf.rw.&lt;span style=&#34;color:#50fa7b&#34;&gt;Lock&lt;/span&gt;()
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; commitIndex &amp;gt; rf.lastApplied {
+			rf.lastApplied = commitIndex
+		}
+
+		rf.rw.&lt;span style=&#34;color:#50fa7b&#34;&gt;Unlock&lt;/span&gt;()
+	}
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;需要注意因为写channel时是不加锁的，而写channel是可能出现并发的，可能存在一种情况：applier在写入一批旧日志时，follower接受leader的 &lt;code&gt;InstallSnapshot&lt;/code&gt; 之后将新的snapshot写入channel。此时channel的写入顺序可能是：旧日志1 -&amp;gt; 新快照 -&amp;gt; 旧日志2。&lt;/p&gt;
+&lt;p&gt;service层读channel是线性的，在读出snapshot并调用 &lt;code&gt;CondInstallSnapshot&lt;/code&gt; 后会更新raft层的lastApplied、commitIndex。因此在raft层apply完日志之后，重新获得锁去更新lastApplied时要注意不能回退，在这二者之间可能service层已经对更新的快照调用过 &lt;code&gt;CondInstallSnapshot&lt;/code&gt; 了（新快照的 lastIncludeIndex 一定大于 commitIndex ）。&lt;/p&gt;
+</description>
+        </item>
+        <item>
+        <title>MapReduce</title>
+        <link>https://cza2000.github.io/2022/mapreduce/</link>
+        <pubDate>Thu, 03 Feb 2022 15:01:24 +0800</pubDate>
+        
+        <guid>https://cza2000.github.io/2022/mapreduce/</guid>
         <description>&lt;h1 id=&#34;lab1-mapreduce&#34;&gt;Lab1: MapReduce&lt;/h1&gt;
 &lt;p&gt;在本次lab中我们的任务是实现一个分布式的MapReduce，它由两个程序组成，Coordinator和Worker。只有一个Coordinator，一个或多个Worker并行执行。&lt;/p&gt;
 &lt;p&gt;每个Worker将通过RPC与Coordinator通信以请求一个Map或Reduce任务，之后从一个或多个文件中读取任务的输入，执行任务，并将任务的输出写入一个或多个文件。&lt;/p&gt;
 &lt;p&gt;Coordinator应注意到Worker是否在合理的时间内（10s）完成了任务，如果没有则将相同的任务交给另一个Worker。&lt;/p&gt;
 &lt;h2 id=&#34;coordinator&#34;&gt;Coordinator&lt;/h2&gt;
-&lt;p&gt;写这个lab的时候刚学go语言不久，觉得channel这个东西很帅，就使用了很多channel实现了一个lock-free版本的Coordinator，算是实践了一下csp。&lt;/p&gt;
+&lt;p&gt;写这个lab的时候刚学go语言不久，觉得channel这个东西很帅，就使用了很多channel实现了一个lock-free版本的Coordinator，实践了一下csp。&lt;/p&gt;
 &lt;h3 id=&#34;核心结构体&#34;&gt;核心结构体&lt;/h3&gt;
-&lt;p&gt;Coordinator维护每一个Map和Reduce任务的状态，这样就不用维护每一个worker的状态，也利于worker的弹性伸缩。&lt;/p&gt;
+&lt;p&gt;Coordinator维护每一个Map和Reduce任务的状态，这样就不用维护每一个worker的状态，这也利于worker的弹性伸缩。&lt;/p&gt;
 &lt;p&gt;xxxidCh用于在获取任务编号并发放给worker，xxxDoneCh和xxxUndoneCh用于获取完成或未完成的任务编号修改任务状态。&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; Coordinator &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
 	files          []&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;
@@ -29,9 +609,11 @@
 	reduceidCh     &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
 	mapStatus      []Task
 	reduceStatus   []Task
+
 	heartbeatCh    &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; heartbeatMsg
 	reportCh       &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; reportMsg
 	stateCh        &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; getStateMsg
+
 	mapDoneCh      &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; Execution
 	reduceDoneCh   &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; Execution
 	mapUndoneCh    &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; Execution
@@ -76,6 +658,7 @@
 	}
 	c.heartbeatCh &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt; msg
 	&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;msg.Done
+
 	log.&lt;span style=&#34;color:#50fa7b&#34;&gt;Printf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Coordinator] run heartbeat [%s] for worker&amp;#34;&lt;/span&gt;, response)
 	&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;nil&lt;/span&gt;
 }
@@ -86,8 +669,10 @@
 		request: request,
 		Done:      &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;make&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt;{}),
 	}
+
 	c.reportCh &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt; msg
 	&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;msg.Done
+
 	log.&lt;span style=&#34;color:#50fa7b&#34;&gt;Println&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Coordinator] finish dealing with the report from worker&amp;#34;&lt;/span&gt;)
 	&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;nil&lt;/span&gt;
 }
@@ -135,6 +720,7 @@
 
 		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; stMsg &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;c.stateCh:
 			stMsg.state &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt; c.reduceComplete
+
 		}
 	}
 }
@@ -142,6 +728,7 @@
 &lt;p&gt;worker的实现比较简单，只需要循环向coordinator请求任务执行。&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;Worker&lt;/span&gt;(mapf &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;, &lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;) []KeyValue,
 	reducef &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;, []&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;) &lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;) {
+
 	&lt;span style=&#34;color:#6272a4&#34;&gt;// Your worker implementation here.
 &lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; {
 		response &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;doHeartbeat&lt;/span&gt;()
@@ -149,19 +736,16 @@
 		&lt;span style=&#34;color:#ff79c6&#34;&gt;switch&lt;/span&gt; response.Type {
 		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; Map:
 			&lt;span style=&#34;color:#50fa7b&#34;&gt;doMapTask&lt;/span&gt;(mapf, response.Id, response.Term, response.NReduce, response.Name)
-
 		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; Reduce:
 			&lt;span style=&#34;color:#50fa7b&#34;&gt;doReduceTask&lt;/span&gt;(reducef, response.Id,response.Term, response.NMap)
-
 		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; Wait:
 			time.&lt;span style=&#34;color:#50fa7b&#34;&gt;Sleep&lt;/span&gt;(&lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt; time.Second)
-
 		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; Completed:
 			&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt;
-			
 		&lt;span style=&#34;color:#ff79c6&#34;&gt;default&lt;/span&gt;:
 			&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;panic&lt;/span&gt;(fmt.&lt;span style=&#34;color:#50fa7b&#34;&gt;Sprintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Worker] unexpected jobType %v&amp;#34;&lt;/span&gt;, response.Type))
 		}
+
 	}
 }
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;执行Map任务时，只需将mapf函数产生的中间文件kv pair按照ihash(kv.Key)%nReduce的余数写入不同的文件等待Reduce即可。写入的文件要先调用ioutil.TempFile(&amp;quot;&amp;quot;, &amp;ldquo;temp&amp;rdquo;)生成再调用os.Rename()改为mr-i-j。&lt;/p&gt;
@@ -171,171 +755,9 @@
         <item>
         <title>Test</title>
         <link>https://cza2000.github.io/2022/test/</link>
-        <pubDate>Wed, 02 Feb 2022 21:24:15 +0800</pubDate>
-        
-        <guid>https://cza2000.github.io/2022/test/</guid>
-        <description>&lt;h1 id=&#34;lab1-mapreduce&#34;&gt;Lab1: MapReduce&lt;/h1&gt;
-&lt;p&gt;在本次lab中我们的任务是实现一个分布式的MapReduce，它由两个程序组成，Coordinator和Worker。只有一个Coordinator，一个或多个Worker并行执行。&lt;/p&gt;
-&lt;p&gt;每个Worker将通过RPC与Coordinator通信以请求一个Map或Reduce任务，之后从一个或多个文件中读取任务的输入，执行任务，并将任务的输出写入一个或多个文件。&lt;/p&gt;
-&lt;p&gt;Coordinator应注意到Worker是否在合理的时间内（10s）完成了任务，如果没有则将相同的任务交给另一个Worker。&lt;/p&gt;
-&lt;h2 id=&#34;coordinator&#34;&gt;Coordinator&lt;/h2&gt;
-&lt;p&gt;写这个lab的时候刚学go语言不久，觉得channel这个东西很帅，就使用了很多channel实现了一个lock-free版本的Coordinator，算是实践了一下csp。&lt;/p&gt;
-&lt;h3 id=&#34;核心结构体&#34;&gt;核心结构体&lt;/h3&gt;
-&lt;p&gt;Coordinator维护每一个Map和Reduce任务的状态，这样就不用维护每一个worker的状态，也利于worker的弹性伸缩。&lt;/p&gt;
-&lt;p&gt;xxxidCh用于在获取任务编号并发放给worker，xxxDoneCh和xxxUndoneCh用于获取完成或未完成的任务编号修改任务状态。&lt;/p&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; Coordinator &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
-	files          []&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;
-	nMap           &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
-	nReduce        &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
-	mapidCh        &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
-	reduceidCh     &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
-	mapStatus      []Task
-	reduceStatus   []Task
-	heartbeatCh    &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; heartbeatMsg
-	reportCh       &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; reportMsg
-	stateCh        &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; getStateMsg
-	mapDoneCh      &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; Execution
-	reduceDoneCh   &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; Execution
-	mapUndoneCh    &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; Execution
-	reduceUndoneCh &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; Execution
-	
-	mapComplete    &lt;span style=&#34;color:#8be9fd&#34;&gt;bool&lt;/span&gt;
-	reduceComplete &lt;span style=&#34;color:#8be9fd&#34;&gt;bool&lt;/span&gt;
-	mapRemain      &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
-	reduceRemain   &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
-}
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;每个任务的状态有3种，每个任务被初始化时都是UnStarted，被分配给Worker之后转换为Processing，收到Report完成转为Done，未完成转为UnStarted。&lt;/p&gt;
-&lt;p&gt;结构体Task用term和任务状态共同表示一个任务的信息，term代表该任务被分配给worker执行的次数。&lt;/p&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; TaskStatus &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
-&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;const&lt;/span&gt; (
-	UnStarted TaskStatus = &lt;span style=&#34;color:#ff79c6&#34;&gt;iota&lt;/span&gt;
-	Processing
-	Done
-)
-
-&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; Task &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
-	term &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
-	TaskStatus
-}
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h3 id=&#34;rpc-handler&#34;&gt;RPC-handler&lt;/h3&gt;
-&lt;p&gt;Coordinator接收到RPC之后，包装出一个xxxMsg结构，传入RPC对应的channel中。&lt;/p&gt;
-&lt;p&gt;Done在这里作用类似于一个回调。Coordinator在启动时会在后台启动一个goroutine，不断监控 heartbeatCh 和 reportCh 中的Msg并处理，处理完成后执行msg.Done &amp;lt;- struct{}{}。在RPC handler中只需要等待Done这个channel返回。&lt;/p&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; heartbeatMsg &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
-	response &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;HeartbeatResponse
-	Done       &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt;{}
-}
-
-&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; reportMsg &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
-	request &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;ReportRequest
-	Done      &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt;{}
-}
-
-&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (c &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Coordinator) &lt;span style=&#34;color:#50fa7b&#34;&gt;Heartbeat&lt;/span&gt;(request &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;HeartbeatRequest, response &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;HeartbeatResponse) &lt;span style=&#34;color:#8be9fd&#34;&gt;error&lt;/span&gt; {
-	log.&lt;span style=&#34;color:#50fa7b&#34;&gt;Println&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Coordinator] receive a request from worker&amp;#34;&lt;/span&gt;)
-	msg &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; heartbeatMsg{
-		response: response,
-		Done:       &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;make&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt;{}),
-	}
-	c.heartbeatCh &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt; msg
-	&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;msg.Done
-	log.&lt;span style=&#34;color:#50fa7b&#34;&gt;Printf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Coordinator] run heartbeat [%s] for worker&amp;#34;&lt;/span&gt;, response)
-	&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;nil&lt;/span&gt;
-}
-
-&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (c &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Coordinator) &lt;span style=&#34;color:#50fa7b&#34;&gt;Report&lt;/span&gt;(request &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;ReportRequest, response &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;ReportResponse) &lt;span style=&#34;color:#8be9fd&#34;&gt;error&lt;/span&gt; {
-	log.&lt;span style=&#34;color:#50fa7b&#34;&gt;Printf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Coordinator] receive worker&amp;#39;s report [%s]&amp;#34;&lt;/span&gt;, request)
-	msg &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; reportMsg{
-		request: request,
-		Done:      &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;make&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt;{}),
-	}
-	c.reportCh &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt; msg
-	&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;msg.Done
-	log.&lt;span style=&#34;color:#50fa7b&#34;&gt;Println&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Coordinator] finish dealing with the report from worker&amp;#34;&lt;/span&gt;)
-	&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;nil&lt;/span&gt;
-}
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;&lt;code&gt;handleHeartbeatMsg&lt;/code&gt;函数中处理心跳，根据当前Map和Reduce任务的状态给Worker分配一个任务、让worker等待或是告知所有任务已经完成。任务的id从mapidCh或reduceidCh两个channel中读出，在response中还要加上任务的term，每次分配该任务前需要对term自增以在不同的执行者之间区分。&lt;/p&gt;
-&lt;p&gt;那么任务的id是什么时候写入channel中的呢？Coordinator在初始化时先将所有Map任务的id写入mapidCh，在所有Map任务都完成后将所有Reduce任务的id写入reduceidCh。&lt;/p&gt;
-&lt;p&gt;需要注意一点，每个任务在分配之后10s内如果没有收到Report，则应该默认任务失败。这需要另起一个goroutine来判断，直接sleep 10s之后将id写入Undone channel即可，让run函数去判断。&lt;/p&gt;
-&lt;p&gt;在&lt;code&gt;handleReportMsg&lt;/code&gt;函数中处理worker的返回任务结果，根据结构类型将任务的Execution写入对应的Done/Undone channel。我将任务的term和id包装成一个Execution结构表示任务的一次执行，使得某次任务失败是超时还是worker返回失败这两种情况可以被区分。&lt;/p&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; Execution &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
-	term &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
-	id   &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
-}
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h3 id=&#34;核心逻辑&#34;&gt;核心逻辑&lt;/h3&gt;
-&lt;p&gt;run函数是Coordinator的核心，它作为一个后台运行的goroutine在不断的循环中监听各个channel并执行对应的操作。由于所有的数据都在这一个goroutine中修改，避免了data-race。&lt;/p&gt;
-&lt;p&gt;Coordinator真正处理worker上报的任务的完成情况是由run函数在select中同时监听这4个channel，再根据任务id来执行对应逻辑。因此&lt;code&gt;handleReportMsg&lt;/code&gt;函数可以另起一个goroutine来执行，这4个channel的容量也只需设置为1。&lt;/p&gt;
-&lt;p&gt;从4个channel读出任务id后要注意，只有在对应的状态、Execution中term和本地任务的term一致时才能执行逻辑。&lt;/p&gt;
-&lt;p&gt;例如某个MapFailed消息在10s之后到达，这可能是因为网络拥塞或是worker执行任务太慢，这个map任务已经被重新分配给了另一个worker，此时状态是仍是Processing。但这时term不一致应该放弃处理这个MapFailed消息。&lt;/p&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (c &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Coordinator) &lt;span style=&#34;color:#50fa7b&#34;&gt;run&lt;/span&gt;() &lt;span style=&#34;color:#8be9fd&#34;&gt;error&lt;/span&gt; {
-	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; {
-		&lt;span style=&#34;color:#ff79c6&#34;&gt;select&lt;/span&gt; {
-		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; hbMsg &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;c.heartbeatCh:
-			c.&lt;span style=&#34;color:#50fa7b&#34;&gt;handleHeartbeatMsg&lt;/span&gt;(hbMsg)
-
-		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; rpMsg &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;c.reportCh:
-			&lt;span style=&#34;color:#ff79c6&#34;&gt;go&lt;/span&gt; c.&lt;span style=&#34;color:#50fa7b&#34;&gt;handleReportMsg&lt;/span&gt;(rpMsg)
-
-		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; e &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;c.mapDoneCh:
-			&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; c.mapStatus[e.id].TaskStatus &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; Processing &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; c.mapStatus[e.id].term &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; e.term {
-				···
-			}
-
-		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; e &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;c.reduceDoneCh:
-			&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; c.reduceStatus[e.id].TaskStatus &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; Processing &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; c.reduceStatus[e.id].term &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; e.term {
-				···
-			}
-
-		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; e &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;c.mapUndoneCh:
-			&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; c.mapStatus[e.id].TaskStatus &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; Processing &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; c.mapStatus[e.id].term &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; e.term {
-				···
-			}
-
-		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; e &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;c.reduceUndoneCh:
-			&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; c.reduceStatus[e.id].TaskStatus &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; Processing &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; c.reduceStatus[e.id].term &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; e.term {
-				···
-			}
-
-		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; stMsg &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;c.stateCh:
-			stMsg.state &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt; c.reduceComplete
-		}
-	}
-}
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h2 id=&#34;worker&#34;&gt;Worker&lt;/h2&gt;
-&lt;p&gt;worker的实现比较简单，只需要循环向coordinator请求任务执行。&lt;/p&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;Worker&lt;/span&gt;(mapf &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;, &lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;) []KeyValue,
-	reducef &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;, []&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;) &lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;) {
-	&lt;span style=&#34;color:#6272a4&#34;&gt;// Your worker implementation here.
-&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; {
-		response &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;doHeartbeat&lt;/span&gt;()
-		log.&lt;span style=&#34;color:#50fa7b&#34;&gt;Printf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Worker] receive coordinator&amp;#39;s heartbeat [%s]&amp;#34;&lt;/span&gt;, response)
-		&lt;span style=&#34;color:#ff79c6&#34;&gt;switch&lt;/span&gt; response.Type {
-		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; Map:
-			&lt;span style=&#34;color:#50fa7b&#34;&gt;doMapTask&lt;/span&gt;(mapf, response.Id, response.Term, response.NReduce, response.Name)
-
-		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; Reduce:
-			&lt;span style=&#34;color:#50fa7b&#34;&gt;doReduceTask&lt;/span&gt;(reducef, response.Id,response.Term, response.NMap)
-
-		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; Wait:
-			time.&lt;span style=&#34;color:#50fa7b&#34;&gt;Sleep&lt;/span&gt;(&lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt; time.Second)
-
-		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; Completed:
-			&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt;
-			
-		&lt;span style=&#34;color:#ff79c6&#34;&gt;default&lt;/span&gt;:
-			&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;panic&lt;/span&gt;(fmt.&lt;span style=&#34;color:#50fa7b&#34;&gt;Sprintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Worker] unexpected jobType %v&amp;#34;&lt;/span&gt;, response.Type))
-		}
-	}
-}
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;执行Map任务时，只需将mapf函数产生的中间文件kv pair按照ihash(kv.Key)%nReduce的余数写入不同的文件等待Reduce即可。写入的文件要先调用ioutil.TempFile(&amp;quot;&amp;quot;, &amp;ldquo;temp&amp;rdquo;)生成再调用os.Rename()改为mr-i-j。&lt;/p&gt;
-&lt;p&gt;执行Reduce任务时，先建立一个kv数组，再将所有中间文件中的kv pair append到数组中再排序，将相同key对应的所有value append到一个string数组中，喂给reducef函数执行。看起来非常暴力，在工业界应该不可行，但通过本次lab的测试足够了。&lt;/p&gt;
-</description>
-        </item>
-        <item>
-        <title>My First Post</title>
-        <link>https://cza2000.github.io/2022/my-first-post/</link>
         <pubDate>Mon, 31 Jan 2022 14:38:17 +0800</pubDate>
         
-        <guid>https://cza2000.github.io/2022/my-first-post/</guid>
+        <guid>https://cza2000.github.io/2022/test/</guid>
         <description>&lt;h1 id=&#34;hello-world1&#34;&gt;hello world1&lt;/h1&gt;
 &lt;p&gt;777&lt;/p&gt;
 &lt;h2 id=&#34;hello-world2&#34;&gt;hello world2&lt;/h2&gt;

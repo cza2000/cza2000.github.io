@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content='lab3'><title>RaftKV</title>
+
+<link rel='canonical' href='https://cza2000.github.io/2022/raftkv/'>
+
+<link rel="stylesheet" href="/scss/style.min.5f343aefda6021d7c99a35d0d8a06abdad13d86982967b5b28f1008e404a346d.css"><meta property='og:title' content='RaftKV'>
+<meta property='og:description' content='lab3'>
+<meta property='og:url' content='https://cza2000.github.io/2022/raftkv/'>
+<meta property='og:site_name' content='Ziann Chen&#39;s blog'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='分布式系统' /><meta property='article:published_time' content='2022-02-03T15:06:21&#43;08:00'/><meta property='article:modified_time' content='2022-02-03T15:06:21&#43;08:00'/><meta property='og:image' content='https://cza2000.github.io/img/avatar.png' />
+<meta name="twitter:title" content="RaftKV">
+<meta name="twitter:description" content="lab3"><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://cza2000.github.io/img/avatar.png' />
+    </head>
+    <body class="
+    article-page has-toc
+">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex 
+    
+        extended
+    
+">
+    
+        <div id="article-toolbar">
+            <a href="/" class="back-home">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="15 6 9 12 15 18" />
+</svg>
+
+
+
+                <span>Back</span>
+            </a>
+        </div>
+    
+<main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+    <header class="article-category">
+        
+            <a href="/categories/mit6.824/" >
+                mit6.824
+            </a>
+        
+    </header>
+    
+
+    <h2 class="article-title">
+        <a href="/2022/raftkv/">RaftKV</a>
+    </h2>
+
+    
+    <h3 class="article-subtitle">
+        lab3
+    </h3>
+    
+
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">Feb 03, 2022</time>
+            </div>
+        
+
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="12" r="9" />
+  <polyline points="12 7 12 12 15 15" />
+</svg>
+
+
+
+                <time class="article-time--reading">
+                    3 minute read
+                </time>
+            </div>
+        
+    </footer>
+    
+</div>
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="lab3-kvraft">Lab3: KVRaft</h1>
+<p>lab链接 <a class="link" href="https://pdos.csail.mit.edu/6.824/labs/lab-kvraft.html"  target="_blank" rel="noopener"
+    >https://pdos.csail.mit.edu/6.824/labs/lab-kvraft.html</a></p>
+<p>本次lab中我们需要使用lab2中实现的Raft库来构建一个可容错的 Key/Value 存储服务，要求其对外提供强一致性（<code>Strong consistency</code>）。</p>
+<p>这个KV存储服务支持Get/Put/Append三种客户端操作。客户端通过RPC与集群中的leader通信，leader接收到请求后将其包装在一条Raft日志中下放到Raft层进行共识，日志被apply后返回客户端结果。</p>
+<ul>
+<li><a class="link" href="#lab3-kvraft" >Lab3: KVRaft</a></li>
+<li><a class="link" href="#%e4%b8%80%e4%ba%9b%e6%80%9d%e8%80%83" >一些思考</a></li>
+<li><a class="link" href="#client" >client</a></li>
+<li><a class="link" href="#server" >server</a>
+<ul>
+<li><a class="link" href="#state-machine" >state-machine</a></li>
+<li><a class="link" href="#rpc-handler" >RPC handler</a></li>
+<li><a class="link" href="#snapshot" >snapshot</a></li>
+</ul>
+</li>
+</ul>
+<h2 id="一些思考">一些思考</h2>
+<p>在PartA的描述中提到，leader在将一个请求下放到raft层之后，commit之前宕机，这时它无法回复Clerk。又或者是，这条日志成功commit，但返回的RPC丢失。Clerk在规定时间内没有收到结果，会向另一台主机（可能是新选出的leader）发送RPC，这条日志最终被commit之后又会被应用于状态机，从而状态机执行了两次相同的请求。</p>
+<p>这要求我们能够判断重复的请求。因此每个请求都需要被唯一标识，请求中需要加上（ClientID, RequestID），Clerk每次请求成功之后自增RequestID。</p>
+<p>我们还需要在遇到重复的请求时直接返回第一次请求时的结果，这需要我们保存每一个Clerk的最后一次请求的结果ClientID -&gt; (RequestID, LastResponse)。只需要保存最后一次请求结果是因为如果服务端收到RequestID = x的RPC，说明这个Clerk已经收到了RequestID为[1, x-1]之间内的所有请求的结果，服务端如果再次收到这个RequestID在区间之内的请求说明该RPC过期，直接丢弃即可。</p>
+<h2 id="client">client</h2>
+<p>我将3种请求共用了一个RPC，简化了逻辑。</p>
+<p>Clerk保存一个leaderID，请求失败了再换另一个server，请求成功了自增requestID。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#8be9fd;font-style:italic">type</span> Clerk <span style="color:#8be9fd;font-style:italic">struct</span> {
+	servers []<span style="color:#ff79c6">*</span>labrpc.ClientEnd
+	<span style="color:#6272a4">// You will have to modify this struct.
+</span><span style="color:#6272a4"></span>	leaderID  <span style="color:#8be9fd">int</span>
+	clientID  <span style="color:#8be9fd">int64</span>
+	requestID <span style="color:#8be9fd">int</span>
+}
+
+<span style="color:#8be9fd;font-style:italic">func</span> (ck <span style="color:#ff79c6">*</span>Clerk) <span style="color:#50fa7b">Get</span>(key <span style="color:#8be9fd">string</span>) <span style="color:#8be9fd">string</span> {
+	<span style="color:#ff79c6">return</span> ck.<span style="color:#50fa7b">Command</span>(key, <span style="color:#f1fa8c">&#34;&#34;</span>, OpGet)
+}
+
+<span style="color:#8be9fd;font-style:italic">func</span> (ck <span style="color:#ff79c6">*</span>Clerk) <span style="color:#50fa7b">Put</span>(key <span style="color:#8be9fd">string</span>, value <span style="color:#8be9fd">string</span>) {
+	ck.<span style="color:#50fa7b">Command</span>(key, value, OpPut)
+}
+
+<span style="color:#8be9fd;font-style:italic">func</span> (ck <span style="color:#ff79c6">*</span>Clerk) <span style="color:#50fa7b">Append</span>(key <span style="color:#8be9fd">string</span>, value <span style="color:#8be9fd">string</span>) {
+	ck.<span style="color:#50fa7b">Command</span>(key, value, OpAppend)
+}
+
+<span style="color:#8be9fd;font-style:italic">func</span> (ck <span style="color:#ff79c6">*</span>Clerk) <span style="color:#50fa7b">Command</span>(key, value <span style="color:#8be9fd">string</span>, op Operation) <span style="color:#8be9fd">string</span> {
+	req <span style="color:#ff79c6">:=</span> <span style="color:#50fa7b">getCommandRequest</span>(key, value, op, <span style="color:#8be9fd;font-style:italic">int</span>(ck.clientID), ck.requestID)	
+	<span style="color:#ff79c6">for</span> {
+		resp <span style="color:#ff79c6">:=</span> CommandResponse{}
+		<span style="color:#ff79c6">if</span> !ck.servers[ck.leaderID].<span style="color:#50fa7b">Call</span>(<span style="color:#f1fa8c">&#34;KVServer.Command&#34;</span>, <span style="color:#ff79c6">&amp;</span>req, <span style="color:#ff79c6">&amp;</span>resp) <span style="color:#ff79c6">||</span> resp.Err <span style="color:#ff79c6">==</span> ErrWrongLeader <span style="color:#ff79c6">||</span> resp.Err <span style="color:#ff79c6">==</span> ErrTimeout {		
+			ck.leaderID = (ck.leaderID <span style="color:#ff79c6">+</span> <span style="color:#bd93f9">1</span>) <span style="color:#ff79c6">%</span> <span style="color:#8be9fd;font-style:italic">len</span>(ck.servers)
+			<span style="color:#ff79c6">continue</span>
+		}
+
+		ck.requestID<span style="color:#ff79c6">++</span>
+		<span style="color:#ff79c6">return</span>	resp.Value	
+	}
+}
+</code></pre></div><h2 id="server">server</h2>
+<p>KVServer的结构体如下：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#8be9fd;font-style:italic">type</span> KVServer <span style="color:#8be9fd;font-style:italic">struct</span> {
+	mu      sync.RWMutex
+	me      <span style="color:#8be9fd">int</span>
+	rf      <span style="color:#ff79c6">*</span>raft.Raft
+	applyCh <span style="color:#8be9fd;font-style:italic">chan</span> raft.ApplyMsg
+	dead    <span style="color:#8be9fd">int32</span> <span style="color:#6272a4">// set by Kill()
+</span><span style="color:#6272a4"></span>
+	maxraftstate <span style="color:#8be9fd">int</span> <span style="color:#6272a4">// snapshot if log grows this big
+</span><span style="color:#6272a4"></span>
+	<span style="color:#6272a4">// Your definitions here.
+</span><span style="color:#6272a4"></span>	persister        <span style="color:#ff79c6">*</span>raft.Persister
+	notifyChans      <span style="color:#8be9fd;font-style:italic">map</span>[<span style="color:#8be9fd">int</span>]<span style="color:#8be9fd;font-style:italic">chan</span> <span style="color:#ff79c6">*</span>CommandResponse
+	db               <span style="color:#8be9fd;font-style:italic">map</span>[<span style="color:#8be9fd">string</span>]<span style="color:#8be9fd">string</span>
+	lastSessions     <span style="color:#8be9fd;font-style:italic">map</span>[<span style="color:#8be9fd">int</span>]Session
+	lastAppliedIndex <span style="color:#8be9fd">int</span>
+}
+</code></pre></div><h3 id="state-machine">state-machine</h3>
+<p>本次lab中只需使用一个内存版本的 KV 状态机 map[string]string。</p>
+<h3 id="rpc-handler">RPC handler</h3>
+<p>客户端请求来临时，Server端会启动一个协程作为RPC handler来处理客户端请求，其中会调用 <code>Raft.Start</code> 函数将请求下放到Raft层形成一条日志去做共识。在Raft层，每条被commit的日志会按照index的顺序写入applyCh中，上层必须也按index序从applyCh中读出日志并应用于状态机，这样才能保证不同节点上的数据一致。</p>
+<p>这要求必须有一个单独的applier协程来循环读applyCh，并应用于状态机。由于来自不同客户端的请求是并发的，如果在RPC handler协程中直接读applyCh无法保证index序。返回给客户端的response要根据日志应用于状态机的结果来生成，这需要我们处理RPC handler和applier协程之间的通信问题。</p>
+<p>自然想到使用channel来通信，使用一个 notifyChans map (log index -&gt; response) 来记录每一个请求对应的channel。在RPC handler协程将日志下放到Raft层之后，在notifyChans中注册一个channel并阻塞读，applier协程读出日志，应用于状态机之后生成response写入这个channel。RPC handler协程在规定时间内读出结果则正常返回客户端，若超时则返回超时。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#8be9fd;font-style:italic">func</span> (kv <span style="color:#ff79c6">*</span>KVServer) <span style="color:#50fa7b">Command</span>(req <span style="color:#ff79c6">*</span>CommandRequest, resp <span style="color:#ff79c6">*</span>CommandResponse) {
+	<span style="color:#6272a4">// Your code here.
+</span><span style="color:#6272a4"></span>	kv.mu.<span style="color:#50fa7b">RLock</span>()
+	<span style="color:#ff79c6">defer</span> <span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[KVServer %d] reply %+v for Request %+v&#34;</span>, kv.me, resp, req)
+
+	<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[KVServer %d] received Request %+v from Clerk&#34;</span>, kv.me, req)
+	<span style="color:#ff79c6">if</span> req.Op <span style="color:#ff79c6">!=</span> OpGet <span style="color:#ff79c6">&amp;&amp;</span> kv.<span style="color:#50fa7b">isDuplicatedRequest</span>(req.ClientID, req.RequestID) {
+		resp.Err = kv.lastSessions[req.ClientID].Err
+		kv.mu.<span style="color:#50fa7b">RUnlock</span>()
+		<span style="color:#ff79c6">return</span>
+	}
+	kv.mu.<span style="color:#50fa7b">RUnlock</span>()
+
+	index, _, isLeader <span style="color:#ff79c6">:=</span> kv.rf.<span style="color:#50fa7b">Start</span>(<span style="color:#ff79c6">*</span>req)
+	<span style="color:#ff79c6">if</span> !isLeader {
+		resp.Err = ErrWrongLeader
+		<span style="color:#ff79c6">return</span>
+	}
+
+	<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[KVServer %d] add command into raft layer [index %d]&#34;</span>, kv.me, index)
+	kv.mu.<span style="color:#50fa7b">Lock</span>()
+	ch <span style="color:#ff79c6">:=</span> kv.<span style="color:#50fa7b">getNotifyChan</span>(index)
+	kv.mu.<span style="color:#50fa7b">Unlock</span>()
+
+	<span style="color:#ff79c6">select</span> {
+	<span style="color:#ff79c6">case</span> result <span style="color:#ff79c6">:=</span> <span style="color:#ff79c6">&lt;-</span>ch:
+		resp.Value = result.Value
+		resp.Err = result.Err
+
+	<span style="color:#ff79c6">case</span> <span style="color:#ff79c6">&lt;-</span>time.<span style="color:#50fa7b">NewTimer</span>(<span style="color:#bd93f9">500</span> <span style="color:#ff79c6">*</span> time.Millisecond).C:
+		resp.Err = ErrTimeout
+	}
+
+	<span style="color:#ff79c6">go</span> <span style="color:#8be9fd;font-style:italic">func</span>() {
+		kv.mu.<span style="color:#50fa7b">Lock</span>()
+		kv.<span style="color:#50fa7b">removeNotifyChan</span>(index)
+		kv.mu.<span style="color:#50fa7b">Unlock</span>()
+	}()
+}
+
+<span style="color:#8be9fd;font-style:italic">func</span> (kv <span style="color:#ff79c6">*</span>KVServer) <span style="color:#50fa7b">applier</span>() {
+	<span style="color:#ff79c6">for</span> !kv.<span style="color:#50fa7b">killed</span>() {
+		<span style="color:#ff79c6">select</span> {
+		<span style="color:#ff79c6">case</span> applyMsg <span style="color:#ff79c6">:=</span> <span style="color:#ff79c6">&lt;-</span>kv.applyCh:
+			<span style="color:#ff79c6">if</span> applyMsg.CommandValid {
+				command <span style="color:#ff79c6">:=</span> applyMsg.Command.(CommandRequest)
+				
+				kv.mu.<span style="color:#50fa7b">Lock</span>()
+				<span style="color:#ff79c6">if</span> applyMsg.CommandIndex <span style="color:#ff79c6">&lt;=</span> kv.lastAppliedIndex {
+					<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[KVServer %d] discard out-of-date apply Msg in [index %d]&#34;</span>, kv.me, applyMsg.CommandIndex)
+					kv.mu.<span style="color:#50fa7b">Unlock</span>()
+					<span style="color:#ff79c6">continue</span>
+				}
+				
+				kv.lastAppliedIndex = applyMsg.CommandIndex
+				<span style="color:#8be9fd;font-style:italic">var</span> response <span style="color:#ff79c6">*</span>CommandResponse
+				<span style="color:#ff79c6">if</span> command.Op <span style="color:#ff79c6">!=</span> OpGet <span style="color:#ff79c6">&amp;&amp;</span> kv.<span style="color:#50fa7b">isDuplicatedRequest</span>(command.ClientID, command.RequestID) {
+					<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[KVServer %d] received a duplicated command in [index %d]&#34;</span>, kv.me, applyMsg.CommandIndex)
+					response = kv.lastSessions[command.ClientID].CommandResponse
+				} <span style="color:#ff79c6">else</span> {
+					response = kv.<span style="color:#50fa7b">applyCommand</span>(command)
+					<span style="color:#ff79c6">if</span> command.Op <span style="color:#ff79c6">!=</span> OpGet {
+						kv.lastSessions[command.ClientID] = Session{
+							RequestID:       command.RequestID,
+							CommandResponse: response,
+						}
+					}
+				}
+
+				<span style="color:#ff79c6">if</span> kv.<span style="color:#50fa7b">needToSnapshot</span>(applyMsg.RaftStateSize) {
+					<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[KVServer %d] reach maxraftstate, take a snapshot till [index %d]&#34;</span>, kv.me, applyMsg.CommandIndex)
+					kv.<span style="color:#50fa7b">takeSnapshot</span>(applyMsg.CommandIndex)
+				}
+
+				<span style="color:#ff79c6">if</span> currentTerm, isLeader <span style="color:#ff79c6">:=</span> kv.rf.<span style="color:#50fa7b">GetState</span>(); currentTerm <span style="color:#ff79c6">==</span> applyMsg.CommandTerm <span style="color:#ff79c6">&amp;&amp;</span> isLeader {
+					ch <span style="color:#ff79c6">:=</span> kv.<span style="color:#50fa7b">getNotifyChan</span>(applyMsg.CommandIndex)
+					ch <span style="color:#ff79c6">&lt;-</span> response
+				}
+
+				kv.mu.<span style="color:#50fa7b">Unlock</span>()
+			} <span style="color:#ff79c6">else</span> {
+				kv.mu.<span style="color:#50fa7b">Lock</span>()
+				<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[KVServer %d] received a snapshot from raft layer [index %d, term %d]&#34;</span>, kv.me, applyMsg.SnapshotIndex, applyMsg.SnapshotTerm)
+				<span style="color:#ff79c6">if</span> kv.rf.<span style="color:#50fa7b">CondInstallSnapshot</span>(applyMsg.SnapshotTerm, applyMsg.SnapshotIndex, applyMsg.Snapshot) {
+					kv.<span style="color:#50fa7b">applySnapshotToService</span>(applyMsg.Snapshot)
+					kv.lastAppliedIndex = applyMsg.SnapshotIndex
+				}
+				kv.mu.<span style="color:#50fa7b">Unlock</span>()
+			}
+		}
+	}
+}
+</code></pre></div><p>有几点需要注意：</p>
+<ul>
+<li>
+<p>apply日志时需要防止状态机回滚。在lab2中提到作为follower的节点可能收到leader的install snapshot，将snapshot写入applyCh中，此时读applyCh的顺序是：旧日志1 -&gt; 新快照 -&gt; 旧日志2。应用了新快照之后要避免再次应用旧日志，所以应用快照之后也要更新 lastAppliedIndex，应用日志时要先判断是否 applyMsg.CommandIndex &lt;= kv.lastAppliedIndex。</p>
+</li>
+<li>
+<p>仅对leader的notifyChan进行通知。每个节点在读出日志后都要提交到状态机，且更新lastSessions。但只有leader需要将response写入notifyChan。leader可能会在提交日志后失去leader身份，所以在applier中写入response前要先判断。此时RPC handler协程就让其超时。</p>
+</li>
+<li>
+<p>客户端的非读请求需要两次去重。重复的请求到来时，之前相同的请求可能已经被应用于该节点的状态机，也可能其对应的日志还没被commit。因此需要在RPC handler中调用Start之前以及日志commit之后应用于状态机之前两次去重。</p>
+</li>
+<li>
+<p>leader在调用Start提交日志后去获取notifyChan来阻塞读 以及 applier 在commit日志并应用于状态机之后获取notifyChan来写入response 这二者之间顺序无法保证。因此channel容量设置为1，先获取channel的协程要负责创建channel，这个过程要加写锁。</p>
+</li>
+</ul>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#8be9fd;font-style:italic">func</span> (kv <span style="color:#ff79c6">*</span>KVServer) <span style="color:#50fa7b">getNotifyChan</span>(index <span style="color:#8be9fd">int</span>) <span style="color:#8be9fd;font-style:italic">chan</span> <span style="color:#ff79c6">*</span>CommandResponse {
+	ch, ok <span style="color:#ff79c6">:=</span> kv.notifyChans[index]
+	<span style="color:#ff79c6">if</span> !ok {
+		ch <span style="color:#ff79c6">:=</span> <span style="color:#8be9fd;font-style:italic">make</span>(<span style="color:#8be9fd;font-style:italic">chan</span> <span style="color:#ff79c6">*</span>CommandResponse, <span style="color:#bd93f9">1</span>)
+		kv.notifyChans[index] = ch
+		<span style="color:#ff79c6">return</span> ch
+	}
+
+	<span style="color:#ff79c6">return</span> ch
+}
+</code></pre></div><h3 id="snapshot">snapshot</h3>
+<p>part B中要求我们在raft state size达到阈值时给raft层下发快照。快照中不仅需要包含KV状态机，还需要包含lastSessions客户端请求去重表。由于快照是和lastIncludeIndex对应的，所以需要由applier协程在将对应的index的日志应用于状态机后继续阻塞的生成快照。</p>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E5%88%86%E5%B8%83%E5%BC%8F%E7%B3%BB%E7%BB%9F/">分布式系统</a>
+        
+    </section>
+
+
+    </footer>
+
+
+    
+</article>
+
+    
+
+    <aside class="related-contents--wrapper">
+    
+    
+        <h2 class="section-title">Related contents</h2>
+        <div class="related-contents">
+            <div class="flex article-list--tile">
+                
+                    
+<article class="">
+    <a href="/2022/raft/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Raft</h2>
+        </div>
+    </a>
+</article>
+                
+                    
+<article class="">
+    <a href="/2022/mapreduce/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">MapReduce</h2>
+        </div>
+    </a>
+</article>
+                
+            </div>
+        </div>
+    
+</aside>
+
+     
+    
+        
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2022 Ziann Chen&#39;s blog
+    </section>
+    
+    <section class="powerby">
+        Built with <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> <br />
+        Theme <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.7.0">Stack</a></b> designed by <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a>
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.css"integrity="sha256-c0uckgykQ9v5k&#43;IqViZOZKc47Jn7KQil4/MP3ySA3F8="crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.css"integrity="sha256-SBLU4vv6CA6lHsZ1XyTdhyjJxCjPif/TRkjnsyGAGnE="crossorigin="anonymous"
+            >
+
+            </main>
+    
+        <aside class="sidebar right-sidebar sticky">
+            <section class="widget archives">
+                <div class="widget-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+                </div>
+                <h2 class="widget-title section-title">Table of contents</h2>
+                
+                <div class="widget--toc">
+                    <nav id="TableOfContents">
+  <ol>
+    <li><a href="#一些思考">一些思考</a></li>
+    <li><a href="#client">client</a></li>
+    <li><a href="#server">server</a>
+      <ol>
+        <li><a href="#state-machine">state-machine</a></li>
+        <li><a href="#rpc-handler">RPC handler</a></li>
+        <li><a href="#snapshot">snapshot</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+                </div>
+            </section>
+        </aside>
+    
+
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.5/dist/vibrant.min.js"integrity="sha256-5NovOZc4iwiAWTYIFiIM7DxKUXKWvpVEuMEPLzcm5/g="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

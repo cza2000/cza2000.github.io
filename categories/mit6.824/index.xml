@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>Posts on Ziann Chen&#39;s blog</title>
-    <link>https://cza2000.github.io/post/</link>
-    <description>Recent content in Posts on Ziann Chen&#39;s blog</description>
+    <title>mit6.824 on Ziann Chen&#39;s blog</title>
+    <link>https://cza2000.github.io/categories/mit6.824/</link>
+    <description>Recent content in mit6.824 on Ziann Chen&#39;s blog</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>zh-CN</language>
-    <lastBuildDate>Thu, 03 Feb 2022 15:06:21 +0800</lastBuildDate><atom:link href="https://cza2000.github.io/post/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Thu, 03 Feb 2022 15:06:21 +0800</lastBuildDate><atom:link href="https://cza2000.github.io/categories/mit6.824/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>RaftKV</title>
       <link>https://cza2000.github.io/2022/raftkv/</link>
@@ -54,19 +54,6 @@ xxxidCh用于在获取任务编号并发放给worker，xxxDoneCh和xxxUndoneCh�
 type Coordinator struct { files []string nMap int nReduce int mapidCh chan int reduceidCh chan int mapStatus []Task reduceStatus []Task heartbeatCh chan heartbeatMsg reportCh chan reportMsg stateCh chan getStateMsg mapDoneCh chan Execution reduceDoneCh chan Execution mapUndoneCh chan Execution reduceUndoneCh chan Execution mapComplete bool reduceComplete bool mapRemain int reduceRemain int } 每个任务的状态有3种，每个任务被初始化时都是UnStarted，被分配给Worker之后转换为Processing，收到Report完成转为Done，未完成转为UnStarted。
 结构体Task用term和任务状态共同表示一个任务的信息，term代表该任务被分配给worker执行的次数。
 type TaskStatus int const ( UnStarted TaskStatus = iota Processing Done ) type Task struct { term int TaskStatus } RPC-handler Coordinator接收到RPC之后，包装出一个xxxMsg结构，传入RPC对应的channel中。</description>
-    </item>
-    
-    <item>
-      <title>Test</title>
-      <link>https://cza2000.github.io/2022/test/</link>
-      <pubDate>Mon, 31 Jan 2022 14:38:17 +0800</pubDate>
-      
-      <guid>https://cza2000.github.io/2022/test/</guid>
-      <description>hello world1 777
-hello world2 777
-Hello Hugo3  aaa bbb ccc  func main() { fmt.Printf(&amp;#34;Hello world&amp;#34;) } hello world2 777
-hello world2 777
-Hello Hugo3 hello world2 888</description>
     </item>
     
   </channel>
