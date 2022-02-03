@@ -2,26 +2,26 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Pages on Ziann Chen&#39;s blog</title>
-    <link>https://cza2000.github.io/page/</link>
+    <link>ziannchen.work/page/</link>
     <description>Recent content in Pages on Ziann Chen&#39;s blog</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>zh-CN</language>
-    <lastBuildDate>Tue, 28 May 2019 00:00:00 +0000</lastBuildDate><atom:link href="https://cza2000.github.io/page/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Tue, 28 May 2019 00:00:00 +0000</lastBuildDate><atom:link href="ziannchen.work/page/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Archives</title>
-      <link>https://cza2000.github.io/archives/</link>
+      <link>ziannchen.work/archives/</link>
       <pubDate>Tue, 28 May 2019 00:00:00 +0000</pubDate>
       
-      <guid>https://cza2000.github.io/archives/</guid>
+      <guid>ziannchen.work/archives/</guid>
       <description></description>
     </item>
     
     <item>
       <title>About</title>
-      <link>https://cza2000.github.io/about/</link>
+      <link>ziannchen.work/about/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
       
-      <guid>https://cza2000.github.io/about/</guid>
+      <guid>ziannchen.work/about/</guid>
       <description>自我介绍 ziannchen，陈子桉，西安交通大学计算机科学与技术专业大四在读。
 周董铁粉
 关于本站 托管于 Github pages，Powered by Hugo，Theme stack.</description>
@@ -29,10 +29,10 @@
     
     <item>
       <title>Links</title>
-      <link>https://cza2000.github.io/links/</link>
+      <link>ziannchen.work/links/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
       
-      <guid>https://cza2000.github.io/links/</guid>
+      <guid>ziannchen.work/links/</guid>
       <description>To use this feature, add links section to frontmatter.
 This page&amp;rsquo;s frontmatter:
 links: - title: GitHub description: GitHub is the world&amp;#39;s largest software development platform. website: https://github.com image: https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png - title: TypeScript description: TypeScript is a typed superset of JavaScript that compiles to plain JavaScript. website: https://www.typescriptlang.org image: ts-logo-128.jpg image field accepts both local and external images.</description>
@@ -40,10 +40,10 @@ links: - title: GitHub description: GitHub is the world&amp;#39;s largest softwa
     
     <item>
       <title>Search</title>
-      <link>https://cza2000.github.io/search/</link>
+      <link>ziannchen.work/search/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
       
-      <guid>https://cza2000.github.io/search/</guid>
+      <guid>ziannchen.work/search/</guid>
       <description></description>
     </item>
     

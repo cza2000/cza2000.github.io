@@ -2,16 +2,16 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
     <channel>
         <title>Ziann Chen&#39;s blog</title>
-        <link>https://cza2000.github.io/</link>
+        <link>ziannchen.work/</link>
         <description>Recent content on Ziann Chen&#39;s blog</description>
         <generator>Hugo -- gohugo.io</generator>
         <language>zh-CN</language>
-        <lastBuildDate>Thu, 03 Feb 2022 15:06:21 +0800</lastBuildDate><atom:link href="https://cza2000.github.io/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Thu, 03 Feb 2022 15:06:21 +0800</lastBuildDate><atom:link href="ziannchen.work/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>RaftKV</title>
-        <link>https://cza2000.github.io/2022/raftkv/</link>
+        <link>ziannchen.work/2022/raftkv/</link>
         <pubDate>Thu, 03 Feb 2022 15:06:21 +0800</pubDate>
         
-        <guid>https://cza2000.github.io/2022/raftkv/</guid>
+        <guid>ziannchen.work/2022/raftkv/</guid>
         <description>&lt;h1 id=&#34;lab3-kvraft&#34;&gt;Lab3: KVRaft&lt;/h1&gt;
 &lt;p&gt;lab链接 &lt;a class=&#34;link&#34; href=&#34;https://pdos.csail.mit.edu/6.824/labs/lab-kvraft.html&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;https://pdos.csail.mit.edu/6.824/labs/lab-kvraft.html&lt;/a&gt;&lt;/p&gt;
@@ -216,10 +216,10 @@
         </item>
         <item>
         <title>Raft</title>
-        <link>https://cza2000.github.io/2022/raft/</link>
+        <link>ziannchen.work/2022/raft/</link>
         <pubDate>Thu, 03 Feb 2022 15:04:30 +0800</pubDate>
         
-        <guid>https://cza2000.github.io/2022/raft/</guid>
+        <guid>ziannchen.work/2022/raft/</guid>
         <description>&lt;h1 id=&#34;lab2-raft&#34;&gt;Lab2: Raft&lt;/h1&gt;
 &lt;p&gt;lab原链接 &lt;a class=&#34;link&#34; href=&#34;https://pdos.csail.mit.edu/6.824/labs/lab-raft.html&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;https://pdos.csail.mit.edu/6.824/labs/lab-raft.html&lt;/a&gt;&lt;/p&gt;
@@ -588,10 +588,10 @@
         </item>
         <item>
         <title>MapReduce</title>
-        <link>https://cza2000.github.io/2022/mapreduce/</link>
+        <link>ziannchen.work/2022/mapreduce/</link>
         <pubDate>Thu, 03 Feb 2022 15:01:24 +0800</pubDate>
         
-        <guid>https://cza2000.github.io/2022/mapreduce/</guid>
+        <guid>ziannchen.work/2022/mapreduce/</guid>
         <description>&lt;h1 id=&#34;lab1-mapreduce&#34;&gt;Lab1: MapReduce&lt;/h1&gt;
 &lt;p&gt;在本次lab中我们的任务是实现一个分布式的MapReduce，它由两个程序组成，Coordinator和Worker。只有一个Coordinator，一个或多个Worker并行执行。&lt;/p&gt;
 &lt;p&gt;每个Worker将通过RPC与Coordinator通信以请求一个Map或Reduce任务，之后从一个或多个文件中读取任务的输入，执行任务，并将任务的输出写入一个或多个文件。&lt;/p&gt;
@@ -754,10 +754,10 @@
         </item>
         <item>
         <title>Test</title>
-        <link>https://cza2000.github.io/2022/test/</link>
+        <link>ziannchen.work/2022/test/</link>
         <pubDate>Mon, 31 Jan 2022 14:38:17 +0800</pubDate>
         
-        <guid>https://cza2000.github.io/2022/test/</guid>
+        <guid>ziannchen.work/2022/test/</guid>
         <description>&lt;h1 id=&#34;hello-world1&#34;&gt;hello world1&lt;/h1&gt;
 &lt;p&gt;777&lt;/p&gt;
 &lt;h2 id=&#34;hello-world2&#34;&gt;hello world2&lt;/h2&gt;
