@@ -2,17 +2,17 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Categories on Ziann Chen&#39;s blog</title>
-    <link>ziannchen.work/categories/</link>
+    <link>https://cza2000.github.io/categories/</link>
     <description>Recent content in Categories on Ziann Chen&#39;s blog</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>zh-CN</language>
-    <lastBuildDate>Thu, 03 Feb 2022 15:06:21 +0800</lastBuildDate><atom:link href="ziannchen.work/categories/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Thu, 03 Feb 2022 15:06:21 +0800</lastBuildDate><atom:link href="https://cza2000.github.io/categories/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>mit6.824</title>
-      <link>ziannchen.work/categories/mit6.824/</link>
+      <link>https://cza2000.github.io/categories/mit6.824/</link>
       <pubDate>Thu, 03 Feb 2022 15:06:21 +0800</pubDate>
       
-      <guid>ziannchen.work/categories/mit6.824/</guid>
+      <guid>https://cza2000.github.io/categories/mit6.824/</guid>
       <description></description>
     </item>
     
