@@ -1,97 +1,363 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
-  <channel>
-    <title>Ziann Chen&#39;s blog</title>
-    <link>https://cza2000.github.io/</link>
-    <description>Recent content on Ziann Chen&#39;s blog</description>
-    <generator>Hugo -- gohugo.io</generator>
-    <language>zh-CN</language>
-    <lastBuildDate>Wed, 02 Feb 2022 21:24:15 +0800</lastBuildDate><atom:link href="https://cza2000.github.io/index.xml" rel="self" type="application/rss+xml" />
-    <item>
-      <title>Test</title>
-      <link>https://cza2000.github.io/2022/test/</link>
-      <pubDate>Wed, 02 Feb 2022 21:24:15 +0800</pubDate>
-      
-      <guid>https://cza2000.github.io/2022/test/</guid>
-      <description>Lab1: MapReduce 在本次lab中我们的任务是实现一个分布式的MapReduce，它由两个程序组成，Coordinator和Worker。只有一个Coordinator，一个或多个Worker并行执行。
-每个Worker将通过RPC与Coordinator通信以请求一个Map或Reduce任务，之后从一个或多个文件中读取任务的输入，执行任务，并将任务的输出写入一个或多个文件。
-Coordinator应注意到Worker是否在合理的时间内（10s）完成了任务，如果没有则将相同的任务交给另一个Worker。
-Coordinator 写这个lab的时候刚学go语言不久，觉得channel这个东西很帅，就使用了很多channel实现了一个lock-free版本的Coordinator，算是实践了一下csp。
-核心结构体 Coordinator维护每一个Map和Reduce任务的状态，这样就不用维护每一个worker的状态，也利于worker的弹性伸缩。
-xxxidCh用于在获取任务编号并发放给worker，xxxDoneCh和xxxUndoneCh用于获取完成或未完成的任务编号修改任务状态。
-type Coordinator struct { files []string nMap int nReduce int mapidCh chan int reduceidCh chan int mapStatus []Task reduceStatus []Task heartbeatCh chan heartbeatMsg reportCh chan reportMsg stateCh chan getStateMsg mapDoneCh chan Execution reduceDoneCh chan Execution mapUndoneCh chan Execution reduceUndoneCh chan Execution mapComplete bool reduceComplete bool mapRemain int reduceRemain int } 每个任务的状态有3种，每个任务被初始化时都是UnStarted，被分配给Worker之后转换为Processing，收到Report完成转为Done，未完成转为UnStarted。
-结构体Task用term和任务状态共同表示一个任务的信息，term代表该任务被分配给worker执行的次数。
-type TaskStatus int const ( UnStarted TaskStatus = iota Processing Done ) type Task struct { term int TaskStatus } RPC-handler Coordinator接收到RPC之后，包装出一个xxxMsg结构，传入RPC对应的channel中。</description>
-    </item>
-    
-    <item>
-      <title>Test</title>
-      <link>https://cza2000.github.io/2022/test/</link>
-      <pubDate>Wed, 02 Feb 2022 21:24:15 +0800</pubDate>
-      
-      <guid>https://cza2000.github.io/2022/test/</guid>
-      <description>Lab1: MapReduce 在本次lab中我们的任务是实现一个分布式的MapReduce，它由两个程序组成，Coordinator和Worker。只有一个Coordinator，一个或多个Worker并行执行。
-每个Worker将通过RPC与Coordinator通信以请求一个Map或Reduce任务，之后从一个或多个文件中读取任务的输入，执行任务，并将任务的输出写入一个或多个文件。
-Coordinator应注意到Worker是否在合理的时间内（10s）完成了任务，如果没有则将相同的任务交给另一个Worker。
-Coordinator 写这个lab的时候刚学go语言不久，觉得channel这个东西很帅，就使用了很多channel实现了一个lock-free版本的Coordinator，算是实践了一下csp。
-核心结构体 Coordinator维护每一个Map和Reduce任务的状态，这样就不用维护每一个worker的状态，也利于worker的弹性伸缩。
-xxxidCh用于在获取任务编号并发放给worker，xxxDoneCh和xxxUndoneCh用于获取完成或未完成的任务编号修改任务状态。
-type Coordinator struct { files []string nMap int nReduce int mapidCh chan int reduceidCh chan int mapStatus []Task reduceStatus []Task heartbeatCh chan heartbeatMsg reportCh chan reportMsg stateCh chan getStateMsg mapDoneCh chan Execution reduceDoneCh chan Execution mapUndoneCh chan Execution reduceUndoneCh chan Execution mapComplete bool reduceComplete bool mapRemain int reduceRemain int } 每个任务的状态有3种，每个任务被初始化时都是UnStarted，被分配给Worker之后转换为Processing，收到Report完成转为Done，未完成转为UnStarted。
-结构体Task用term和任务状态共同表示一个任务的信息，term代表该任务被分配给worker执行的次数。
-type TaskStatus int const ( UnStarted TaskStatus = iota Processing Done ) type Task struct { term int TaskStatus } RPC-handler Coordinator接收到RPC之后，包装出一个xxxMsg结构，传入RPC对应的channel中。</description>
-    </item>
-    
-    <item>
-      <title>My First Post</title>
-      <link>https://cza2000.github.io/2022/my-first-post/</link>
-      <pubDate>Mon, 31 Jan 2022 14:38:17 +0800</pubDate>
-      
-      <guid>https://cza2000.github.io/2022/my-first-post/</guid>
-      <description>hello world1 777
-hello world2 777
-Hello Hugo3  aaa bbb ccc  func main() { fmt.Printf(&amp;#34;Hello world&amp;#34;) } hello world2 777
-hello world2 777
-Hello Hugo3 hello world2 888</description>
-    </item>
-    
-    <item>
-      <title>Archives</title>
-      <link>https://cza2000.github.io/archives/</link>
-      <pubDate>Tue, 28 May 2019 00:00:00 +0000</pubDate>
-      
-      <guid>https://cza2000.github.io/archives/</guid>
-      <description></description>
-    </item>
-    
-    <item>
-      <title>About</title>
-      <link>https://cza2000.github.io/about/</link>
-      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
-      
-      <guid>https://cza2000.github.io/about/</guid>
-      <description>自我介绍 ziannchen，陈子桉，西安交通大学计算机科学与技术专业大四在读。
-关于本站 托管于 Github pages，Powered by Hugo，Theme stack.</description>
-    </item>
-    
-    <item>
-      <title>Links</title>
-      <link>https://cza2000.github.io/links/</link>
-      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
-      
-      <guid>https://cza2000.github.io/links/</guid>
-      <description>To use this feature, add links section to frontmatter.
-This page&amp;rsquo;s frontmatter:
-links: - title: GitHub description: GitHub is the world&amp;#39;s largest software development platform. website: https://github.com image: https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png - title: TypeScript description: TypeScript is a typed superset of JavaScript that compiles to plain JavaScript. website: https://www.typescriptlang.org image: ts-logo-128.jpg image field accepts both local and external images.</description>
-    </item>
-    
-    <item>
-      <title>Search</title>
-      <link>https://cza2000.github.io/search/</link>
-      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
-      
-      <guid>https://cza2000.github.io/search/</guid>
-      <description></description>
-    </item>
-    
-  </channel>
+    <channel>
+        <title>Ziann Chen&#39;s blog</title>
+        <link>https://cza2000.github.io/</link>
+        <description>Recent content on Ziann Chen&#39;s blog</description>
+        <generator>Hugo -- gohugo.io</generator>
+        <language>zh-CN</language>
+        <lastBuildDate>Wed, 02 Feb 2022 21:24:15 +0800</lastBuildDate><atom:link href="https://cza2000.github.io/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>Test</title>
+        <link>https://cza2000.github.io/2022/test/</link>
+        <pubDate>Wed, 02 Feb 2022 21:24:15 +0800</pubDate>
+        
+        <guid>https://cza2000.github.io/2022/test/</guid>
+        <description>&lt;h1 id=&#34;lab1-mapreduce&#34;&gt;Lab1: MapReduce&lt;/h1&gt;
+&lt;p&gt;在本次lab中我们的任务是实现一个分布式的MapReduce，它由两个程序组成，Coordinator和Worker。只有一个Coordinator，一个或多个Worker并行执行。&lt;/p&gt;
+&lt;p&gt;每个Worker将通过RPC与Coordinator通信以请求一个Map或Reduce任务，之后从一个或多个文件中读取任务的输入，执行任务，并将任务的输出写入一个或多个文件。&lt;/p&gt;
+&lt;p&gt;Coordinator应注意到Worker是否在合理的时间内（10s）完成了任务，如果没有则将相同的任务交给另一个Worker。&lt;/p&gt;
+&lt;h2 id=&#34;coordinator&#34;&gt;Coordinator&lt;/h2&gt;
+&lt;p&gt;写这个lab的时候刚学go语言不久，觉得channel这个东西很帅，就使用了很多channel实现了一个lock-free版本的Coordinator，算是实践了一下csp。&lt;/p&gt;
+&lt;h3 id=&#34;核心结构体&#34;&gt;核心结构体&lt;/h3&gt;
+&lt;p&gt;Coordinator维护每一个Map和Reduce任务的状态，这样就不用维护每一个worker的状态，也利于worker的弹性伸缩。&lt;/p&gt;
+&lt;p&gt;xxxidCh用于在获取任务编号并发放给worker，xxxDoneCh和xxxUndoneCh用于获取完成或未完成的任务编号修改任务状态。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; Coordinator &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	files          []&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;
+	nMap           &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	nReduce        &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	mapidCh        &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	reduceidCh     &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	mapStatus      []Task
+	reduceStatus   []Task
+	heartbeatCh    &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; heartbeatMsg
+	reportCh       &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; reportMsg
+	stateCh        &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; getStateMsg
+	mapDoneCh      &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; Execution
+	reduceDoneCh   &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; Execution
+	mapUndoneCh    &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; Execution
+	reduceUndoneCh &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; Execution
+	
+	mapComplete    &lt;span style=&#34;color:#8be9fd&#34;&gt;bool&lt;/span&gt;
+	reduceComplete &lt;span style=&#34;color:#8be9fd&#34;&gt;bool&lt;/span&gt;
+	mapRemain      &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	reduceRemain   &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;每个任务的状态有3种，每个任务被初始化时都是UnStarted，被分配给Worker之后转换为Processing，收到Report完成转为Done，未完成转为UnStarted。&lt;/p&gt;
+&lt;p&gt;结构体Task用term和任务状态共同表示一个任务的信息，term代表该任务被分配给worker执行的次数。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; TaskStatus &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;const&lt;/span&gt; (
+	UnStarted TaskStatus = &lt;span style=&#34;color:#ff79c6&#34;&gt;iota&lt;/span&gt;
+	Processing
+	Done
+)
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; Task &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	term &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	TaskStatus
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h3 id=&#34;rpc-handler&#34;&gt;RPC-handler&lt;/h3&gt;
+&lt;p&gt;Coordinator接收到RPC之后，包装出一个xxxMsg结构，传入RPC对应的channel中。&lt;/p&gt;
+&lt;p&gt;Done在这里作用类似于一个回调。Coordinator在启动时会在后台启动一个goroutine，不断监控 heartbeatCh 和 reportCh 中的Msg并处理，处理完成后执行msg.Done &amp;lt;- struct{}{}。在RPC handler中只需要等待Done这个channel返回。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; heartbeatMsg &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	response &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;HeartbeatResponse
+	Done       &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt;{}
+}
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; reportMsg &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	request &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;ReportRequest
+	Done      &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt;{}
+}
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (c &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Coordinator) &lt;span style=&#34;color:#50fa7b&#34;&gt;Heartbeat&lt;/span&gt;(request &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;HeartbeatRequest, response &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;HeartbeatResponse) &lt;span style=&#34;color:#8be9fd&#34;&gt;error&lt;/span&gt; {
+	log.&lt;span style=&#34;color:#50fa7b&#34;&gt;Println&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Coordinator] receive a request from worker&amp;#34;&lt;/span&gt;)
+	msg &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; heartbeatMsg{
+		response: response,
+		Done:       &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;make&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt;{}),
+	}
+	c.heartbeatCh &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt; msg
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;msg.Done
+	log.&lt;span style=&#34;color:#50fa7b&#34;&gt;Printf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Coordinator] run heartbeat [%s] for worker&amp;#34;&lt;/span&gt;, response)
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;nil&lt;/span&gt;
+}
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (c &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Coordinator) &lt;span style=&#34;color:#50fa7b&#34;&gt;Report&lt;/span&gt;(request &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;ReportRequest, response &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;ReportResponse) &lt;span style=&#34;color:#8be9fd&#34;&gt;error&lt;/span&gt; {
+	log.&lt;span style=&#34;color:#50fa7b&#34;&gt;Printf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Coordinator] receive worker&amp;#39;s report [%s]&amp;#34;&lt;/span&gt;, request)
+	msg &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; reportMsg{
+		request: request,
+		Done:      &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;make&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt;{}),
+	}
+	c.reportCh &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt; msg
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;msg.Done
+	log.&lt;span style=&#34;color:#50fa7b&#34;&gt;Println&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Coordinator] finish dealing with the report from worker&amp;#34;&lt;/span&gt;)
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;nil&lt;/span&gt;
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;&lt;code&gt;handleHeartbeatMsg&lt;/code&gt;函数中处理心跳，根据当前Map和Reduce任务的状态给Worker分配一个任务、让worker等待或是告知所有任务已经完成。任务的id从mapidCh或reduceidCh两个channel中读出，在response中还要加上任务的term，每次分配该任务前需要对term自增以在不同的执行者之间区分。&lt;/p&gt;
+&lt;p&gt;那么任务的id是什么时候写入channel中的呢？Coordinator在初始化时先将所有Map任务的id写入mapidCh，在所有Map任务都完成后将所有Reduce任务的id写入reduceidCh。&lt;/p&gt;
+&lt;p&gt;需要注意一点，每个任务在分配之后10s内如果没有收到Report，则应该默认任务失败。这需要另起一个goroutine来判断，直接sleep 10s之后将id写入Undone channel即可，让run函数去判断。&lt;/p&gt;
+&lt;p&gt;在&lt;code&gt;handleReportMsg&lt;/code&gt;函数中处理worker的返回任务结果，根据结构类型将任务的Execution写入对应的Done/Undone channel。我将任务的term和id包装成一个Execution结构表示任务的一次执行，使得某次任务失败是超时还是worker返回失败这两种情况可以被区分。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; Execution &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	term &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	id   &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h3 id=&#34;核心逻辑&#34;&gt;核心逻辑&lt;/h3&gt;
+&lt;p&gt;run函数是Coordinator的核心，它作为一个后台运行的goroutine在不断的循环中监听各个channel并执行对应的操作。由于所有的数据都在这一个goroutine中修改，避免了data-race。&lt;/p&gt;
+&lt;p&gt;Coordinator真正处理worker上报的任务的完成情况是由run函数在select中同时监听这4个channel，再根据任务id来执行对应逻辑。因此&lt;code&gt;handleReportMsg&lt;/code&gt;函数可以另起一个goroutine来执行，这4个channel的容量也只需设置为1。&lt;/p&gt;
+&lt;p&gt;从4个channel读出任务id后要注意，只有在对应的状态、Execution中term和本地任务的term一致时才能执行逻辑。&lt;/p&gt;
+&lt;p&gt;例如某个MapFailed消息在10s之后到达，这可能是因为网络拥塞或是worker执行任务太慢，这个map任务已经被重新分配给了另一个worker，此时状态是仍是Processing。但这时term不一致应该放弃处理这个MapFailed消息。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (c &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Coordinator) &lt;span style=&#34;color:#50fa7b&#34;&gt;run&lt;/span&gt;() &lt;span style=&#34;color:#8be9fd&#34;&gt;error&lt;/span&gt; {
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;select&lt;/span&gt; {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; hbMsg &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;c.heartbeatCh:
+			c.&lt;span style=&#34;color:#50fa7b&#34;&gt;handleHeartbeatMsg&lt;/span&gt;(hbMsg)
+
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; rpMsg &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;c.reportCh:
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;go&lt;/span&gt; c.&lt;span style=&#34;color:#50fa7b&#34;&gt;handleReportMsg&lt;/span&gt;(rpMsg)
+
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; e &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;c.mapDoneCh:
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; c.mapStatus[e.id].TaskStatus &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; Processing &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; c.mapStatus[e.id].term &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; e.term {
+				···
+			}
+
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; e &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;c.reduceDoneCh:
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; c.reduceStatus[e.id].TaskStatus &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; Processing &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; c.reduceStatus[e.id].term &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; e.term {
+				···
+			}
+
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; e &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;c.mapUndoneCh:
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; c.mapStatus[e.id].TaskStatus &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; Processing &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; c.mapStatus[e.id].term &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; e.term {
+				···
+			}
+
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; e &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;c.reduceUndoneCh:
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; c.reduceStatus[e.id].TaskStatus &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; Processing &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; c.reduceStatus[e.id].term &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; e.term {
+				···
+			}
+
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; stMsg &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;c.stateCh:
+			stMsg.state &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt; c.reduceComplete
+		}
+	}
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h2 id=&#34;worker&#34;&gt;Worker&lt;/h2&gt;
+&lt;p&gt;worker的实现比较简单，只需要循环向coordinator请求任务执行。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;Worker&lt;/span&gt;(mapf &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;, &lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;) []KeyValue,
+	reducef &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;, []&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;) &lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;) {
+	&lt;span style=&#34;color:#6272a4&#34;&gt;// Your worker implementation here.
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; {
+		response &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;doHeartbeat&lt;/span&gt;()
+		log.&lt;span style=&#34;color:#50fa7b&#34;&gt;Printf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Worker] receive coordinator&amp;#39;s heartbeat [%s]&amp;#34;&lt;/span&gt;, response)
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;switch&lt;/span&gt; response.Type {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; Map:
+			&lt;span style=&#34;color:#50fa7b&#34;&gt;doMapTask&lt;/span&gt;(mapf, response.Id, response.Term, response.NReduce, response.Name)
+
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; Reduce:
+			&lt;span style=&#34;color:#50fa7b&#34;&gt;doReduceTask&lt;/span&gt;(reducef, response.Id,response.Term, response.NMap)
+
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; Wait:
+			time.&lt;span style=&#34;color:#50fa7b&#34;&gt;Sleep&lt;/span&gt;(&lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt; time.Second)
+
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; Completed:
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt;
+			
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;default&lt;/span&gt;:
+			&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;panic&lt;/span&gt;(fmt.&lt;span style=&#34;color:#50fa7b&#34;&gt;Sprintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Worker] unexpected jobType %v&amp;#34;&lt;/span&gt;, response.Type))
+		}
+	}
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;执行Map任务时，只需将mapf函数产生的中间文件kv pair按照ihash(kv.Key)%nReduce的余数写入不同的文件等待Reduce即可。写入的文件要先调用ioutil.TempFile(&amp;quot;&amp;quot;, &amp;ldquo;temp&amp;rdquo;)生成再调用os.Rename()改为mr-i-j。&lt;/p&gt;
+&lt;p&gt;执行Reduce任务时，先建立一个kv数组，再将所有中间文件中的kv pair append到数组中再排序，将相同key对应的所有value append到一个string数组中，喂给reducef函数执行。看起来非常暴力，在工业界应该不可行，但通过本次lab的测试足够了。&lt;/p&gt;
+</description>
+        </item>
+        <item>
+        <title>Test</title>
+        <link>https://cza2000.github.io/2022/test/</link>
+        <pubDate>Wed, 02 Feb 2022 21:24:15 +0800</pubDate>
+        
+        <guid>https://cza2000.github.io/2022/test/</guid>
+        <description>&lt;h1 id=&#34;lab1-mapreduce&#34;&gt;Lab1: MapReduce&lt;/h1&gt;
+&lt;p&gt;在本次lab中我们的任务是实现一个分布式的MapReduce，它由两个程序组成，Coordinator和Worker。只有一个Coordinator，一个或多个Worker并行执行。&lt;/p&gt;
+&lt;p&gt;每个Worker将通过RPC与Coordinator通信以请求一个Map或Reduce任务，之后从一个或多个文件中读取任务的输入，执行任务，并将任务的输出写入一个或多个文件。&lt;/p&gt;
+&lt;p&gt;Coordinator应注意到Worker是否在合理的时间内（10s）完成了任务，如果没有则将相同的任务交给另一个Worker。&lt;/p&gt;
+&lt;h2 id=&#34;coordinator&#34;&gt;Coordinator&lt;/h2&gt;
+&lt;p&gt;写这个lab的时候刚学go语言不久，觉得channel这个东西很帅，就使用了很多channel实现了一个lock-free版本的Coordinator，算是实践了一下csp。&lt;/p&gt;
+&lt;h3 id=&#34;核心结构体&#34;&gt;核心结构体&lt;/h3&gt;
+&lt;p&gt;Coordinator维护每一个Map和Reduce任务的状态，这样就不用维护每一个worker的状态，也利于worker的弹性伸缩。&lt;/p&gt;
+&lt;p&gt;xxxidCh用于在获取任务编号并发放给worker，xxxDoneCh和xxxUndoneCh用于获取完成或未完成的任务编号修改任务状态。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; Coordinator &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	files          []&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;
+	nMap           &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	nReduce        &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	mapidCh        &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	reduceidCh     &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	mapStatus      []Task
+	reduceStatus   []Task
+	heartbeatCh    &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; heartbeatMsg
+	reportCh       &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; reportMsg
+	stateCh        &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; getStateMsg
+	mapDoneCh      &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; Execution
+	reduceDoneCh   &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; Execution
+	mapUndoneCh    &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; Execution
+	reduceUndoneCh &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; Execution
+	
+	mapComplete    &lt;span style=&#34;color:#8be9fd&#34;&gt;bool&lt;/span&gt;
+	reduceComplete &lt;span style=&#34;color:#8be9fd&#34;&gt;bool&lt;/span&gt;
+	mapRemain      &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	reduceRemain   &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;每个任务的状态有3种，每个任务被初始化时都是UnStarted，被分配给Worker之后转换为Processing，收到Report完成转为Done，未完成转为UnStarted。&lt;/p&gt;
+&lt;p&gt;结构体Task用term和任务状态共同表示一个任务的信息，term代表该任务被分配给worker执行的次数。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; TaskStatus &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;const&lt;/span&gt; (
+	UnStarted TaskStatus = &lt;span style=&#34;color:#ff79c6&#34;&gt;iota&lt;/span&gt;
+	Processing
+	Done
+)
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; Task &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	term &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	TaskStatus
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h3 id=&#34;rpc-handler&#34;&gt;RPC-handler&lt;/h3&gt;
+&lt;p&gt;Coordinator接收到RPC之后，包装出一个xxxMsg结构，传入RPC对应的channel中。&lt;/p&gt;
+&lt;p&gt;Done在这里作用类似于一个回调。Coordinator在启动时会在后台启动一个goroutine，不断监控 heartbeatCh 和 reportCh 中的Msg并处理，处理完成后执行msg.Done &amp;lt;- struct{}{}。在RPC handler中只需要等待Done这个channel返回。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; heartbeatMsg &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	response &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;HeartbeatResponse
+	Done       &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt;{}
+}
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; reportMsg &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	request &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;ReportRequest
+	Done      &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt;{}
+}
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (c &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Coordinator) &lt;span style=&#34;color:#50fa7b&#34;&gt;Heartbeat&lt;/span&gt;(request &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;HeartbeatRequest, response &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;HeartbeatResponse) &lt;span style=&#34;color:#8be9fd&#34;&gt;error&lt;/span&gt; {
+	log.&lt;span style=&#34;color:#50fa7b&#34;&gt;Println&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Coordinator] receive a request from worker&amp;#34;&lt;/span&gt;)
+	msg &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; heartbeatMsg{
+		response: response,
+		Done:       &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;make&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt;{}),
+	}
+	c.heartbeatCh &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt; msg
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;msg.Done
+	log.&lt;span style=&#34;color:#50fa7b&#34;&gt;Printf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Coordinator] run heartbeat [%s] for worker&amp;#34;&lt;/span&gt;, response)
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;nil&lt;/span&gt;
+}
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (c &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Coordinator) &lt;span style=&#34;color:#50fa7b&#34;&gt;Report&lt;/span&gt;(request &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;ReportRequest, response &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;ReportResponse) &lt;span style=&#34;color:#8be9fd&#34;&gt;error&lt;/span&gt; {
+	log.&lt;span style=&#34;color:#50fa7b&#34;&gt;Printf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Coordinator] receive worker&amp;#39;s report [%s]&amp;#34;&lt;/span&gt;, request)
+	msg &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; reportMsg{
+		request: request,
+		Done:      &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;make&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt;{}),
+	}
+	c.reportCh &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt; msg
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;msg.Done
+	log.&lt;span style=&#34;color:#50fa7b&#34;&gt;Println&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Coordinator] finish dealing with the report from worker&amp;#34;&lt;/span&gt;)
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;nil&lt;/span&gt;
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;&lt;code&gt;handleHeartbeatMsg&lt;/code&gt;函数中处理心跳，根据当前Map和Reduce任务的状态给Worker分配一个任务、让worker等待或是告知所有任务已经完成。任务的id从mapidCh或reduceidCh两个channel中读出，在response中还要加上任务的term，每次分配该任务前需要对term自增以在不同的执行者之间区分。&lt;/p&gt;
+&lt;p&gt;那么任务的id是什么时候写入channel中的呢？Coordinator在初始化时先将所有Map任务的id写入mapidCh，在所有Map任务都完成后将所有Reduce任务的id写入reduceidCh。&lt;/p&gt;
+&lt;p&gt;需要注意一点，每个任务在分配之后10s内如果没有收到Report，则应该默认任务失败。这需要另起一个goroutine来判断，直接sleep 10s之后将id写入Undone channel即可，让run函数去判断。&lt;/p&gt;
+&lt;p&gt;在&lt;code&gt;handleReportMsg&lt;/code&gt;函数中处理worker的返回任务结果，根据结构类型将任务的Execution写入对应的Done/Undone channel。我将任务的term和id包装成一个Execution结构表示任务的一次执行，使得某次任务失败是超时还是worker返回失败这两种情况可以被区分。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; Execution &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	term &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	id   &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h3 id=&#34;核心逻辑&#34;&gt;核心逻辑&lt;/h3&gt;
+&lt;p&gt;run函数是Coordinator的核心，它作为一个后台运行的goroutine在不断的循环中监听各个channel并执行对应的操作。由于所有的数据都在这一个goroutine中修改，避免了data-race。&lt;/p&gt;
+&lt;p&gt;Coordinator真正处理worker上报的任务的完成情况是由run函数在select中同时监听这4个channel，再根据任务id来执行对应逻辑。因此&lt;code&gt;handleReportMsg&lt;/code&gt;函数可以另起一个goroutine来执行，这4个channel的容量也只需设置为1。&lt;/p&gt;
+&lt;p&gt;从4个channel读出任务id后要注意，只有在对应的状态、Execution中term和本地任务的term一致时才能执行逻辑。&lt;/p&gt;
+&lt;p&gt;例如某个MapFailed消息在10s之后到达，这可能是因为网络拥塞或是worker执行任务太慢，这个map任务已经被重新分配给了另一个worker，此时状态是仍是Processing。但这时term不一致应该放弃处理这个MapFailed消息。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (c &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Coordinator) &lt;span style=&#34;color:#50fa7b&#34;&gt;run&lt;/span&gt;() &lt;span style=&#34;color:#8be9fd&#34;&gt;error&lt;/span&gt; {
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;select&lt;/span&gt; {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; hbMsg &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;c.heartbeatCh:
+			c.&lt;span style=&#34;color:#50fa7b&#34;&gt;handleHeartbeatMsg&lt;/span&gt;(hbMsg)
+
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; rpMsg &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;c.reportCh:
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;go&lt;/span&gt; c.&lt;span style=&#34;color:#50fa7b&#34;&gt;handleReportMsg&lt;/span&gt;(rpMsg)
+
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; e &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;c.mapDoneCh:
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; c.mapStatus[e.id].TaskStatus &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; Processing &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; c.mapStatus[e.id].term &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; e.term {
+				···
+			}
+
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; e &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;c.reduceDoneCh:
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; c.reduceStatus[e.id].TaskStatus &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; Processing &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; c.reduceStatus[e.id].term &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; e.term {
+				···
+			}
+
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; e &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;c.mapUndoneCh:
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; c.mapStatus[e.id].TaskStatus &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; Processing &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; c.mapStatus[e.id].term &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; e.term {
+				···
+			}
+
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; e &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;c.reduceUndoneCh:
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; c.reduceStatus[e.id].TaskStatus &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; Processing &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; c.reduceStatus[e.id].term &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; e.term {
+				···
+			}
+
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; stMsg &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;c.stateCh:
+			stMsg.state &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt; c.reduceComplete
+		}
+	}
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h2 id=&#34;worker&#34;&gt;Worker&lt;/h2&gt;
+&lt;p&gt;worker的实现比较简单，只需要循环向coordinator请求任务执行。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;Worker&lt;/span&gt;(mapf &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;, &lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;) []KeyValue,
+	reducef &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;, []&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;) &lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;) {
+	&lt;span style=&#34;color:#6272a4&#34;&gt;// Your worker implementation here.
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; {
+		response &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;doHeartbeat&lt;/span&gt;()
+		log.&lt;span style=&#34;color:#50fa7b&#34;&gt;Printf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Worker] receive coordinator&amp;#39;s heartbeat [%s]&amp;#34;&lt;/span&gt;, response)
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;switch&lt;/span&gt; response.Type {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; Map:
+			&lt;span style=&#34;color:#50fa7b&#34;&gt;doMapTask&lt;/span&gt;(mapf, response.Id, response.Term, response.NReduce, response.Name)
+
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; Reduce:
+			&lt;span style=&#34;color:#50fa7b&#34;&gt;doReduceTask&lt;/span&gt;(reducef, response.Id,response.Term, response.NMap)
+
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; Wait:
+			time.&lt;span style=&#34;color:#50fa7b&#34;&gt;Sleep&lt;/span&gt;(&lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt; time.Second)
+
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; Completed:
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt;
+			
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;default&lt;/span&gt;:
+			&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;panic&lt;/span&gt;(fmt.&lt;span style=&#34;color:#50fa7b&#34;&gt;Sprintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Worker] unexpected jobType %v&amp;#34;&lt;/span&gt;, response.Type))
+		}
+	}
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;执行Map任务时，只需将mapf函数产生的中间文件kv pair按照ihash(kv.Key)%nReduce的余数写入不同的文件等待Reduce即可。写入的文件要先调用ioutil.TempFile(&amp;quot;&amp;quot;, &amp;ldquo;temp&amp;rdquo;)生成再调用os.Rename()改为mr-i-j。&lt;/p&gt;
+&lt;p&gt;执行Reduce任务时，先建立一个kv数组，再将所有中间文件中的kv pair append到数组中再排序，将相同key对应的所有value append到一个string数组中，喂给reducef函数执行。看起来非常暴力，在工业界应该不可行，但通过本次lab的测试足够了。&lt;/p&gt;
+</description>
+        </item>
+        <item>
+        <title>My First Post</title>
+        <link>https://cza2000.github.io/2022/my-first-post/</link>
+        <pubDate>Mon, 31 Jan 2022 14:38:17 +0800</pubDate>
+        
+        <guid>https://cza2000.github.io/2022/my-first-post/</guid>
+        <description>&lt;h1 id=&#34;hello-world1&#34;&gt;hello world1&lt;/h1&gt;
+&lt;p&gt;777&lt;/p&gt;
+&lt;h2 id=&#34;hello-world2&#34;&gt;hello world2&lt;/h2&gt;
+&lt;p&gt;777&lt;/p&gt;
+&lt;h3 id=&#34;hello-hugo3&#34;&gt;Hello Hugo3&lt;/h3&gt;
+&lt;ol&gt;
+&lt;li&gt;aaa&lt;/li&gt;
+&lt;li&gt;bbb&lt;/li&gt;
+&lt;li&gt;ccc&lt;/li&gt;
+&lt;/ol&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-golang&#34; data-lang=&#34;golang&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;main&lt;/span&gt;() {
+    fmt.&lt;span style=&#34;color:#50fa7b&#34;&gt;Printf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;Hello world&amp;#34;&lt;/span&gt;)
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h2 id=&#34;hello-world2-1&#34;&gt;hello world2&lt;/h2&gt;
+&lt;p&gt;777&lt;/p&gt;
+&lt;h2 id=&#34;hello-world2-2&#34;&gt;hello world2&lt;/h2&gt;
+&lt;p&gt;777&lt;/p&gt;
+&lt;h3 id=&#34;hello-hugo3-1&#34;&gt;Hello Hugo3&lt;/h3&gt;
+&lt;h2 id=&#34;hello-world2-3&#34;&gt;hello world2&lt;/h2&gt;
+&lt;p&gt;888&lt;/p&gt;
+</description>
+        </item>
+        
+    </channel>
 </rss>
