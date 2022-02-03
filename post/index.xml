@@ -9,10 +9,27 @@
     <lastBuildDate>Wed, 02 Feb 2022 21:24:15 +0800</lastBuildDate><atom:link href="https://cza2000.github.io/post/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Test</title>
-      <link>https://cza2000.github.io/p/test/</link>
+      <link>https://cza2000.github.io/2022/test/</link>
       <pubDate>Wed, 02 Feb 2022 21:24:15 +0800</pubDate>
       
-      <guid>https://cza2000.github.io/p/test/</guid>
+      <guid>https://cza2000.github.io/2022/test/</guid>
+      <description>Lab1: MapReduce 在本次lab中我们的任务是实现一个分布式的MapReduce，它由两个程序组成，Coordinator和Worker。只有一个Coordinator，一个或多个Worker并行执行。
+每个Worker将通过RPC与Coordinator通信以请求一个Map或Reduce任务，之后从一个或多个文件中读取任务的输入，执行任务，并将任务的输出写入一个或多个文件。
+Coordinator应注意到Worker是否在合理的时间内（10s）完成了任务，如果没有则将相同的任务交给另一个Worker。
+Coordinator 写这个lab的时候刚学go语言不久，觉得channel这个东西很帅，就使用了很多channel实现了一个lock-free版本的Coordinator，算是实践了一下csp。
+核心结构体 Coordinator维护每一个Map和Reduce任务的状态，这样就不用维护每一个worker的状态，也利于worker的弹性伸缩。
+xxxidCh用于在获取任务编号并发放给worker，xxxDoneCh和xxxUndoneCh用于获取完成或未完成的任务编号修改任务状态。
+type Coordinator struct { files []string nMap int nReduce int mapidCh chan int reduceidCh chan int mapStatus []Task reduceStatus []Task heartbeatCh chan heartbeatMsg reportCh chan reportMsg stateCh chan getStateMsg mapDoneCh chan Execution reduceDoneCh chan Execution mapUndoneCh chan Execution reduceUndoneCh chan Execution mapComplete bool reduceComplete bool mapRemain int reduceRemain int } 每个任务的状态有3种，每个任务被初始化时都是UnStarted，被分配给Worker之后转换为Processing，收到Report完成转为Done，未完成转为UnStarted。
+结构体Task用term和任务状态共同表示一个任务的信息，term代表该任务被分配给worker执行的次数。
+type TaskStatus int const ( UnStarted TaskStatus = iota Processing Done ) type Task struct { term int TaskStatus } RPC-handler Coordinator接收到RPC之后，包装出一个xxxMsg结构，传入RPC对应的channel中。</description>
+    </item>
+    
+    <item>
+      <title>Test</title>
+      <link>https://cza2000.github.io/2022/test/</link>
+      <pubDate>Wed, 02 Feb 2022 21:24:15 +0800</pubDate>
+      
+      <guid>https://cza2000.github.io/2022/test/</guid>
       <description>Lab1: MapReduce 在本次lab中我们的任务是实现一个分布式的MapReduce，它由两个程序组成，Coordinator和Worker。只有一个Coordinator，一个或多个Worker并行执行。
 每个Worker将通过RPC与Coordinator通信以请求一个Map或Reduce任务，之后从一个或多个文件中读取任务的输入，执行任务，并将任务的输出写入一个或多个文件。
 Coordinator应注意到Worker是否在合理的时间内（10s）完成了任务，如果没有则将相同的任务交给另一个Worker。
@@ -26,13 +43,22 @@ type TaskStatus int const ( UnStarted TaskStatus = iota Processing Done ) type T
     
     <item>
       <title>My First Post</title>
-      <link>https://cza2000.github.io/p/my-first-post/</link>
+      <link>https://cza2000.github.io/2022/my-first-post/</link>
       <pubDate>Mon, 31 Jan 2022 14:38:17 +0800</pubDate>
       
-      <guid>https://cza2000.github.io/p/my-first-post/</guid>
+      <guid>https://cza2000.github.io/2022/my-first-post/</guid>
       <description>hello world1 777
 hello world2 777
-Hello Hugo3  aaa bbb ccc  func main() { fmt.Printf(&amp;#34;Hello world&amp;#34;) } </description>
+Hello Hugo3  aaa bbb ccc  func main() { fmt.Printf(&amp;#34;Hello world&amp;#34;) } hello world2 777
+hello world2 777
+Hello Hugo3 hello world2 777
+Hello Hugo3 hello world2 777
+Hello Hugo3 hello world2 777
+Hello Hugo3 hello world2 777
+Hello Hugo3 hello world2 777
+Hello Hugo3 hello world2 777
+Hello Hugo3 hello world2 777
+Hello Hugo3 </description>
     </item>
     
   </channel>
