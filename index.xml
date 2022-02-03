@@ -741,31 +741,97 @@
 </description>
         </item>
         <item>
-        <title>Test</title>
-        <link>https://cza2000.github.io/2022/test/</link>
+        <title>Hugo&amp;Stack &#43; Github Pages &#43; Github Actions 建站记录</title>
+        <link>https://cza2000.github.io/2022/hugostack-github-pages-github-actions-%E5%BB%BA%E7%AB%99%E8%AE%B0%E5%BD%95/</link>
         <pubDate>Mon, 31 Jan 2022 14:38:17 +0800</pubDate>
         
-        <guid>https://cza2000.github.io/2022/test/</guid>
-        <description>&lt;h1 id=&#34;hello-world1&#34;&gt;hello world1&lt;/h1&gt;
-&lt;p&gt;777&lt;/p&gt;
-&lt;h2 id=&#34;hello-world2&#34;&gt;hello world2&lt;/h2&gt;
-&lt;p&gt;777&lt;/p&gt;
-&lt;h3 id=&#34;hello-hugo3&#34;&gt;Hello Hugo3&lt;/h3&gt;
-&lt;ol&gt;
-&lt;li&gt;aaa&lt;/li&gt;
-&lt;li&gt;bbb&lt;/li&gt;
-&lt;li&gt;ccc&lt;/li&gt;
-&lt;/ol&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-golang&#34; data-lang=&#34;golang&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;main&lt;/span&gt;() {
-    fmt.&lt;span style=&#34;color:#50fa7b&#34;&gt;Printf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;Hello world&amp;#34;&lt;/span&gt;)
-}
-&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h2 id=&#34;hello-world2-1&#34;&gt;hello world2&lt;/h2&gt;
-&lt;p&gt;777&lt;/p&gt;
-&lt;h2 id=&#34;hello-world2-2&#34;&gt;hello world2&lt;/h2&gt;
-&lt;p&gt;777&lt;/p&gt;
-&lt;h3 id=&#34;hello-hugo3-1&#34;&gt;Hello Hugo3&lt;/h3&gt;
-&lt;h2 id=&#34;hello-world2-3&#34;&gt;hello world2&lt;/h2&gt;
-&lt;p&gt;888&lt;/p&gt;
+        <guid>https://cza2000.github.io/2022/hugostack-github-pages-github-actions-%E5%BB%BA%E7%AB%99%E8%AE%B0%E5%BD%95/</guid>
+        <description>&lt;h2 id=&#34;开端&#34;&gt;开端&lt;/h2&gt;
+&lt;p&gt;一个程序员怎么能没有一个属于自己的技术博客呢？念叨这句话很久了，22年的春节我终于新建了文件夹。&lt;/p&gt;
+&lt;h2 id=&#34;技术栈选型&#34;&gt;技术栈选型&lt;/h2&gt;
+&lt;p&gt;框架 &lt;code&gt;Hugo&lt;/code&gt; ，主题 &lt;code&gt;Stack&lt;/code&gt; ，托管于 &lt;code&gt;GitHub Pages&lt;/code&gt;，域名备案于阿里云。此外使用了 &lt;code&gt;Github Actions&lt;/code&gt; 进行自动化部署。&lt;/p&gt;
+&lt;h2 id=&#34;框架&#34;&gt;框架&lt;/h2&gt;
+&lt;p&gt;一开始只知道博客可以托管在GitHub Pages上，作为完全不懂前端的我，肯定要选个简单的博客框架，上网查了下主要有Hexo和Hugo。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Hexo？要用 nodejs，先pass。&lt;/li&gt;
+&lt;li&gt;Hugo？是 go 语言开发的，这我熟，就它了！&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;code&gt;Hugo&lt;/code&gt; 是由 Go 语言实现的静态网站生成器。简单、易用、高效、易扩展、快速部署。&lt;code&gt;Hugo&lt;/code&gt; 的速度真的非常快，本地运行后，更新一保存之后马上在浏览器之后就能看到结果。此外还要选个主题，我用的是 &lt;code&gt;Stack&lt;/code&gt;。具体看 &lt;a class=&#34;link&#34; href=&#34;https://www.gohugo.org/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Hugo 官方文档&lt;/a&gt; 和 &lt;a class=&#34;link&#34; href=&#34;https://docs.stack.jimmycai.com/zh/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Stack 官方文档&lt;/a&gt;。&lt;/p&gt;
+&lt;p&gt;折腾博客的各种小细节时，基本都在参考这位博主的 &lt;a class=&#34;link&#34; href=&#34;https://mantyke.icu/2022/stack-theme-furnish03/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;装修记录&lt;/a&gt;。&lt;/p&gt;
+&lt;p&gt;需要注意一点，&lt;code&gt;Hugo&lt;/code&gt; 框架的文件结构和 themes 中主题的文件结构是相同的，在修改样式时需要将主题文件夹中的同名文件复制到外边再做修改。若在主题文件夹中修改，由于自动化部署时是在 GitHub Actions 提供的 runner 上每次重新获取 hugo 和 theme 来生成静态网站，本地的更改就没了。&lt;/p&gt;
+&lt;p&gt;写博客时，只需先执行&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;hugo new post/xxx.md
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;之后修改顶部的 FrontMatter&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-yaml&#34; data-lang=&#34;yaml&#34;&gt;---
+&lt;span style=&#34;color:#ff79c6&#34;&gt;title&lt;/span&gt;: &lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;my title&amp;#34;&lt;/span&gt;
+&lt;span style=&#34;color:#ff79c6&#34;&gt;description&lt;/span&gt;: &lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;my description&amp;#34;&lt;/span&gt;
+&lt;span style=&#34;color:#ff79c6&#34;&gt;date&lt;/span&gt;: 2022-02-03T15:01:24&lt;span style=&#34;color:#bd93f9&#34;&gt;+08&lt;/span&gt;:&lt;span style=&#34;color:#bd93f9&#34;&gt;00&lt;/span&gt;
+&lt;span style=&#34;color:#ff79c6&#34;&gt;draft&lt;/span&gt;: &lt;span style=&#34;color:#ff79c6&#34;&gt;true&lt;/span&gt;
+&lt;span style=&#34;color:#ff79c6&#34;&gt;tags&lt;/span&gt;:
+    - tag1
+&lt;span style=&#34;color:#ff79c6&#34;&gt;categories&lt;/span&gt;:
+    - categorie1
+---
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;再之后就可以开始创作了。&lt;/p&gt;
+&lt;h2 id=&#34;后端&#34;&gt;后端&lt;/h2&gt;
+&lt;p&gt;将博客托管在Github Pages上，具体看 &lt;a class=&#34;link&#34; href=&#34;https://pages.github.com/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;官网&lt;/a&gt;。&lt;/p&gt;
+&lt;p&gt;新建一个public Repository，名字要是 &lt;code&gt;username.github.io&lt;/code&gt;。之后在hugo框架根目录下执行 &lt;code&gt;hugo -D&lt;/code&gt; 在 public 文件夹中生成静态网站，再将 public 文件夹中内容 push 到该 Repository 中即可完成部署。&lt;/p&gt;
+&lt;h2 id=&#34;自动化部署&#34;&gt;自动化部署&lt;/h2&gt;
+&lt;p&gt;每次部署很麻烦，需要以下步骤：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;hugo -D
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;cd&lt;/span&gt; public
+git add .
+git commit -m &lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;some messages&amp;#34;&lt;/span&gt;
+git push
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;而且这样想要用git管理源文件有一点麻烦，自然想到使用 GitHub Actions 来完成自动化部署。&lt;/p&gt;
+&lt;p&gt;需要先新建一个 Repository 保存博客框架源文件，我取名为 &lt;code&gt;my-hugo-stack&lt;/code&gt;。&lt;code&gt;username.github.io&lt;/code&gt; 这个Repository保存的是静态网站文件，不要混淆。&lt;/p&gt;
+&lt;p&gt;在 &lt;code&gt;my-hugo-stack&lt;/code&gt; 的 &lt;code&gt;Actions&lt;/code&gt; 中，新建一个 &lt;code&gt;workflow&lt;/code&gt; ，点击 configure 写入以下内容&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-yml&#34; data-lang=&#34;yml&#34;&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;name&lt;/span&gt;: ci
+&lt;span style=&#34;color:#ff79c6&#34;&gt;on&lt;/span&gt;:
+  &lt;span style=&#34;color:#ff79c6&#34;&gt;push&lt;/span&gt;: 
+    &lt;span style=&#34;color:#ff79c6&#34;&gt;branches&lt;/span&gt;: 
+      - master
+      
+&lt;span style=&#34;color:#ff79c6&#34;&gt;jobs&lt;/span&gt;:
+  &lt;span style=&#34;color:#ff79c6&#34;&gt;build&lt;/span&gt;:
+    &lt;span style=&#34;color:#ff79c6&#34;&gt;runs-on&lt;/span&gt;: ubuntu-latest 
+    &lt;span style=&#34;color:#ff79c6&#34;&gt;steps&lt;/span&gt;:
+      - &lt;span style=&#34;color:#ff79c6&#34;&gt;name&lt;/span&gt;: checkout 
+        &lt;span style=&#34;color:#ff79c6&#34;&gt;uses&lt;/span&gt;: actions/checkout@v2.3.4
+        &lt;span style=&#34;color:#ff79c6&#34;&gt;with&lt;/span&gt;:
+          &lt;span style=&#34;color:#ff79c6&#34;&gt;submodules&lt;/span&gt;: &lt;span style=&#34;color:#ff79c6&#34;&gt;true&lt;/span&gt;
+          
+      - &lt;span style=&#34;color:#ff79c6&#34;&gt;name&lt;/span&gt;: Setup Hugo
+        &lt;span style=&#34;color:#ff79c6&#34;&gt;uses&lt;/span&gt;: peaceiris/actions-hugo@v2
+        &lt;span style=&#34;color:#ff79c6&#34;&gt;with&lt;/span&gt;:
+          &lt;span style=&#34;color:#ff79c6&#34;&gt;hugo-version&lt;/span&gt;: &lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#39;0.92.1&amp;#39;&lt;/span&gt;
+          &lt;span style=&#34;color:#ff79c6&#34;&gt;extended&lt;/span&gt;: &lt;span style=&#34;color:#ff79c6&#34;&gt;true&lt;/span&gt;
+          
+      - &lt;span style=&#34;color:#ff79c6&#34;&gt;name&lt;/span&gt;: Build
+        &lt;span style=&#34;color:#ff79c6&#34;&gt;run&lt;/span&gt;: hugo -D
+
+      - &lt;span style=&#34;color:#ff79c6&#34;&gt;name&lt;/span&gt;: Add CNAME
+        &lt;span style=&#34;color:#ff79c6&#34;&gt;run&lt;/span&gt;: echo &amp;#34;ziannchen.work&amp;#34; &amp;gt; public/CNAME
+        
+      - &lt;span style=&#34;color:#ff79c6&#34;&gt;name&lt;/span&gt;: Deploy
+        &lt;span style=&#34;color:#ff79c6&#34;&gt;uses&lt;/span&gt;: peaceiris/actions-gh-pages@v3
+        &lt;span style=&#34;color:#ff79c6&#34;&gt;with&lt;/span&gt;:
+          &lt;span style=&#34;color:#ff79c6&#34;&gt;deploy_key&lt;/span&gt;: ${{ secrets.ACTIONS_DEPLOY_KEY }} 
+          &lt;span style=&#34;color:#ff79c6&#34;&gt;external_repository&lt;/span&gt;: cza2000/cza2000.github.io  
+          &lt;span style=&#34;color:#ff79c6&#34;&gt;publish_branch&lt;/span&gt;: master  
+          &lt;span style=&#34;color:#ff79c6&#34;&gt;publish_dir&lt;/span&gt;: ./public 
+          &lt;span style=&#34;color:#ff79c6&#34;&gt;commit_message&lt;/span&gt;: ${{ github.event.head_commit.message }}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;此外还需要新建一对SSH密钥。私钥写入博客源文件仓库的 &lt;code&gt;Settings&lt;/code&gt; - &lt;code&gt;Actions secrets&lt;/code&gt;，命名为 &lt;code&gt;ACTIONS_DEPLOY_KEY&lt;/code&gt;，公钥写入静态网站仓库的 &lt;code&gt;Settings&lt;/code&gt; - &lt;code&gt;Deploy keys&lt;/code&gt;，命名随意。&lt;/p&gt;
+&lt;p&gt;之后将本地博客源文件 push 至 &lt;code&gt;my-hugo-stack&lt;/code&gt; 的 master 分支就会触发 action，自动部署并将生成的 public 文件夹内的内容 push 到 &lt;code&gt;username.github.io&lt;/code&gt; 中完成部署。&lt;/p&gt;
+&lt;p&gt;由于我买了域名，这样做每次都把我的 CNAME 搞没了，我就在 yml 文件中手动加了一个 step，每次重新生成 CNAME 文件。&lt;/p&gt;
+&lt;h2 id=&#34;todo&#34;&gt;TODO&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;考虑弄个 CDN&lt;/li&gt;
+&lt;/ul&gt;
 </description>
         </item>
         

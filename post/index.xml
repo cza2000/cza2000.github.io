@@ -35,16 +35,12 @@
     </item>
     
     <item>
-      <title>Test</title>
-      <link>https://cza2000.github.io/2022/test/</link>
+      <title>Hugo&amp;Stack &#43; Github Pages &#43; Github Actions 建站记录</title>
+      <link>https://cza2000.github.io/2022/hugostack-github-pages-github-actions-%E5%BB%BA%E7%AB%99%E8%AE%B0%E5%BD%95/</link>
       <pubDate>Mon, 31 Jan 2022 14:38:17 +0800</pubDate>
       
-      <guid>https://cza2000.github.io/2022/test/</guid>
-      <description>hello world1 777
-hello world2 777
-Hello Hugo3  aaa bbb ccc  func main() { fmt.Printf(&amp;#34;Hello world&amp;#34;) } hello world2 777
-hello world2 777
-Hello Hugo3 hello world2 888</description>
+      <guid>https://cza2000.github.io/2022/hugostack-github-pages-github-actions-%E5%BB%BA%E7%AB%99%E8%AE%B0%E5%BD%95/</guid>
+      <description>开端 一个程序员怎么能没有一个属于自己的技术博客呢？念叨这句话很久了，22年的春节我终于新建了文件夹。 技术栈选型 框架 Hugo ，主题 Stack ，托管于 GitHub Pag</description>
     </item>
     
   </channel>

@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content='Hugo &#43; Github Pages'><title>Hugo&amp;Stack &#43; Github Pages &#43; Github Actions 建站记录</title>
+
+<link rel='canonical' href='https://cza2000.github.io/2022/hugostack-github-pages-github-actions-%E5%BB%BA%E7%AB%99%E8%AE%B0%E5%BD%95/'>
+
+<link rel="stylesheet" href="/scss/style.min.0f551e1e8f12e484db7a1602fcb8eced03029344f0e9cedaf9073100eb80d3e8.css"><meta property='og:title' content='Hugo&amp;Stack &#43; Github Pages &#43; Github Actions 建站记录'>
+<meta property='og:description' content='Hugo &#43; Github Pages'>
+<meta property='og:url' content='https://cza2000.github.io/2022/hugostack-github-pages-github-actions-%E5%BB%BA%E7%AB%99%E8%AE%B0%E5%BD%95/'>
+<meta property='og:site_name' content='陈子桉的博客'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:published_time' content='2022-01-31T14:38:17&#43;08:00'/><meta property='article:modified_time' content='2022-01-31T14:38:17&#43;08:00'/><meta property='og:image' content='https://cza2000.github.io/img/avatar.png' />
+<meta name="twitter:title" content="Hugo&amp;Stack &#43; Github Pages &#43; Github Actions 建站记录">
+<meta name="twitter:description" content="Hugo &#43; Github Pages"><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://cza2000.github.io/img/avatar.png' />
+    </head>
+    <body class="
+    article-page has-toc
+">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex 
+    
+        extended
+    
+">
+    
+        <div id="article-toolbar">
+            <a href="/" class="back-home">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="15 6 9 12 15 18" />
+</svg>
+
+
+
+                <span>Back</span>
+            </a>
+        </div>
+    
+<main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+    <header class="article-category">
+        
+        <a href="/categories/%E5%BB%BA%E7%AB%99%E8%AE%B0%E5%BD%95/" >
+            建站记录
+        </a>
+        
+    </header>
+    
+
+    <h2 class="article-title">
+        <a href="/2022/hugostack-github-pages-github-actions-%E5%BB%BA%E7%AB%99%E8%AE%B0%E5%BD%95/">Hugo&amp;Stack &#43; Github Pages &#43; Github Actions 建站记录</a>
+    </h2>
+
+    
+    <h3 class="article-subtitle">
+        Hugo &#43; Github Pages
+    </h3>
+    
+
+    
+    <footer class="article-time">
+        
+        <div>
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+            <time class="article-time--published">Jan 31, 2022</time>
+        </div>
+        
+
+        
+        <div>
+            <time class="article-words">
+                1071字
+            </time>
+        </div>
+        
+    </footer>
+    
+</div>
+</header>
+
+    <section class="article-content">
+    
+    
+    <h2 id="开端">开端</h2>
+<p>一个程序员怎么能没有一个属于自己的技术博客呢？念叨这句话很久了，22年的春节我终于新建了文件夹。</p>
+<h2 id="技术栈选型">技术栈选型</h2>
+<p>框架 <code>Hugo</code> ，主题 <code>Stack</code> ，托管于 <code>GitHub Pages</code>，域名备案于阿里云。此外使用了 <code>Github Actions</code> 进行自动化部署。</p>
+<h2 id="框架">框架</h2>
+<p>一开始只知道博客可以托管在GitHub Pages上，作为完全不懂前端的我，肯定要选个简单的博客框架，上网查了下主要有Hexo和Hugo。</p>
+<ul>
+<li>Hexo？要用 nodejs，先pass。</li>
+<li>Hugo？是 go 语言开发的，这我熟，就它了！</li>
+</ul>
+<p><code>Hugo</code> 是由 Go 语言实现的静态网站生成器。简单、易用、高效、易扩展、快速部署。<code>Hugo</code> 的速度真的非常快，本地运行后，更新一保存之后马上在浏览器之后就能看到结果。此外还要选个主题，我用的是 <code>Stack</code>。具体看 <a class="link" href="https://www.gohugo.org/"  target="_blank" rel="noopener"
+    >Hugo 官方文档</a> 和 <a class="link" href="https://docs.stack.jimmycai.com/zh/"  target="_blank" rel="noopener"
+    >Stack 官方文档</a>。</p>
+<p>折腾博客的各种小细节时，基本都在参考这位博主的 <a class="link" href="https://mantyke.icu/2022/stack-theme-furnish03/"  target="_blank" rel="noopener"
+    >装修记录</a>。</p>
+<p>需要注意一点，<code>Hugo</code> 框架的文件结构和 themes 中主题的文件结构是相同的，在修改样式时需要将主题文件夹中的同名文件复制到外边再做修改。若在主题文件夹中修改，由于自动化部署时是在 GitHub Actions 提供的 runner 上每次重新获取 hugo 和 theme 来生成静态网站，本地的更改就没了。</p>
+<p>写博客时，只需先执行</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">hugo new post/xxx.md
+</code></pre></div><p>之后修改顶部的 FrontMatter</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-yaml" data-lang="yaml">---
+<span style="color:#ff79c6">title</span>: <span style="color:#f1fa8c">&#34;my title&#34;</span>
+<span style="color:#ff79c6">description</span>: <span style="color:#f1fa8c">&#34;my description&#34;</span>
+<span style="color:#ff79c6">date</span>: 2022-02-03T15:01:24<span style="color:#bd93f9">+08</span>:<span style="color:#bd93f9">00</span>
+<span style="color:#ff79c6">draft</span>: <span style="color:#ff79c6">true</span>
+<span style="color:#ff79c6">tags</span>:
+    - tag1
+<span style="color:#ff79c6">categories</span>:
+    - categorie1
+---
+</code></pre></div><p>再之后就可以开始创作了。</p>
+<h2 id="后端">后端</h2>
+<p>将博客托管在Github Pages上，具体看 <a class="link" href="https://pages.github.com/"  target="_blank" rel="noopener"
+    >官网</a>。</p>
+<p>新建一个public Repository，名字要是 <code>username.github.io</code>。之后在hugo框架根目录下执行 <code>hugo -D</code> 在 public 文件夹中生成静态网站，再将 public 文件夹中内容 push 到该 Repository 中即可完成部署。</p>
+<h2 id="自动化部署">自动化部署</h2>
+<p>每次部署很麻烦，需要以下步骤：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">hugo -D
+<span style="color:#8be9fd;font-style:italic">cd</span> public
+git add .
+git commit -m <span style="color:#f1fa8c">&#34;some messages&#34;</span>
+git push
+</code></pre></div><p>而且这样想要用git管理源文件有一点麻烦，自然想到使用 GitHub Actions 来完成自动化部署。</p>
+<p>需要先新建一个 Repository 保存博客框架源文件，我取名为 <code>my-hugo-stack</code>。<code>username.github.io</code> 这个Repository保存的是静态网站文件，不要混淆。</p>
+<p>在 <code>my-hugo-stack</code> 的 <code>Actions</code> 中，新建一个 <code>workflow</code> ，点击 configure 写入以下内容</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-yml" data-lang="yml"><span style="color:#ff79c6">name</span>: ci
+<span style="color:#ff79c6">on</span>:
+  <span style="color:#ff79c6">push</span>: 
+    <span style="color:#ff79c6">branches</span>: 
+      - master
+      
+<span style="color:#ff79c6">jobs</span>:
+  <span style="color:#ff79c6">build</span>:
+    <span style="color:#ff79c6">runs-on</span>: ubuntu-latest 
+    <span style="color:#ff79c6">steps</span>:
+      - <span style="color:#ff79c6">name</span>: checkout 
+        <span style="color:#ff79c6">uses</span>: actions/checkout@v2.3.4
+        <span style="color:#ff79c6">with</span>:
+          <span style="color:#ff79c6">submodules</span>: <span style="color:#ff79c6">true</span>
+          
+      - <span style="color:#ff79c6">name</span>: Setup Hugo
+        <span style="color:#ff79c6">uses</span>: peaceiris/actions-hugo@v2
+        <span style="color:#ff79c6">with</span>:
+          <span style="color:#ff79c6">hugo-version</span>: <span style="color:#f1fa8c">&#39;0.92.1&#39;</span>
+          <span style="color:#ff79c6">extended</span>: <span style="color:#ff79c6">true</span>
+          
+      - <span style="color:#ff79c6">name</span>: Build
+        <span style="color:#ff79c6">run</span>: hugo -D
+
+      - <span style="color:#ff79c6">name</span>: Add CNAME
+        <span style="color:#ff79c6">run</span>: echo &#34;ziannchen.work&#34; &gt; public/CNAME
+        
+      - <span style="color:#ff79c6">name</span>: Deploy
+        <span style="color:#ff79c6">uses</span>: peaceiris/actions-gh-pages@v3
+        <span style="color:#ff79c6">with</span>:
+          <span style="color:#ff79c6">deploy_key</span>: ${{ secrets.ACTIONS_DEPLOY_KEY }} 
+          <span style="color:#ff79c6">external_repository</span>: cza2000/cza2000.github.io  
+          <span style="color:#ff79c6">publish_branch</span>: master  
+          <span style="color:#ff79c6">publish_dir</span>: ./public 
+          <span style="color:#ff79c6">commit_message</span>: ${{ github.event.head_commit.message }}
+</code></pre></div><p>此外还需要新建一对SSH密钥。私钥写入博客源文件仓库的 <code>Settings</code> - <code>Actions secrets</code>，命名为 <code>ACTIONS_DEPLOY_KEY</code>，公钥写入静态网站仓库的 <code>Settings</code> - <code>Deploy keys</code>，命名随意。</p>
+<p>之后将本地博客源文件 push 至 <code>my-hugo-stack</code> 的 master 分支就会触发 action，自动部署并将生成的 public 文件夹内的内容 push 到 <code>username.github.io</code> 中完成部署。</p>
+<p>由于我买了域名，这样做每次都把我的 CNAME 搞没了，我就在 yml 文件中手动加了一个 step，每次重新生成 CNAME 文件。</p>
+<h2 id="todo">TODO</h2>
+<ul>
+<li>考虑弄个 CDN</li>
+</ul>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+
+    </footer>
+
+
+    
+</article>
+
+    
+
+    <aside class="related-contents--wrapper">
+    
+    
+</aside>
+
+     
+    
+        
+    <script src="https://utteranc.es/client.js" 
+        repo="cza2000/cza2000.github.io"
+        issue-term="title"
+        
+        label="github-light"
+        
+        crossorigin="anonymous"
+        async
+        >
+</script>
+
+<style>
+    .utterances {
+        max-width: unset;
+    }
+</style>
+
+<script>
+    function setUtterancesTheme(theme) {
+        let utterances = document.querySelector('.utterances iframe');
+        if (utterances) {
+            utterances.contentWindow.postMessage(
+                {
+                    type: 'set-theme',
+                    theme: `github-${theme}`
+                },
+                'https://utteranc.es'
+            );
+        }
+    }
+
+    addEventListener('message', event => {
+        if (event.origin !== 'https://utteranc.es') return;
+        setUtterancesTheme(document.documentElement.dataset.scheme)
+    });
+
+    window.addEventListener('onColorSchemeChange', (e) => {
+        setUtterancesTheme(e.detail)
+    })
+</script>
+
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2022 陈子桉的博客
+    </section>
+    
+    <section class="powerby">
+        Built with <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> <br />
+        Theme <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.7.0">Stack</a></b> designed by <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a>
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.css"integrity="sha256-c0uckgykQ9v5k&#43;IqViZOZKc47Jn7KQil4/MP3ySA3F8="crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.css"integrity="sha256-SBLU4vv6CA6lHsZ1XyTdhyjJxCjPif/TRkjnsyGAGnE="crossorigin="anonymous"
+            >
+
+            </main>
+    
+        <aside class="sidebar right-sidebar sticky">
+            <section class="widget archives">
+                <div class="widget-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+                </div>
+                <h2 class="widget-title section-title">Table of contents</h2>
+                
+                <div class="widget--toc">
+                    <nav id="TableOfContents">
+  <ol>
+    <li><a href="#开端">开端</a></li>
+    <li><a href="#技术栈选型">技术栈选型</a></li>
+    <li><a href="#框架">框架</a></li>
+    <li><a href="#后端">后端</a></li>
+    <li><a href="#自动化部署">自动化部署</a></li>
+    <li><a href="#todo">TODO</a></li>
+  </ol>
+</nav>
+                </div>
+            </section>
+        </aside>
+    
+
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.5/dist/vibrant.min.js"integrity="sha256-5NovOZc4iwiAWTYIFiIM7DxKUXKWvpVEuMEPLzcm5/g="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>
