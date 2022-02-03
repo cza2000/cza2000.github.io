@@ -103,7 +103,7 @@
         
         <div>
             <time class="article-words">
-                1071字
+                1112字
             </time>
         </div>
         
@@ -197,7 +197,17 @@ git push
 </code></pre></div><p>此外还需要新建一对SSH密钥。私钥写入博客源文件仓库的 <code>Settings</code> - <code>Actions secrets</code>，命名为 <code>ACTIONS_DEPLOY_KEY</code>，公钥写入静态网站仓库的 <code>Settings</code> - <code>Deploy keys</code>，命名随意。</p>
 <p>之后将本地博客源文件 push 至 <code>my-hugo-stack</code> 的 master 分支就会触发 action，自动部署并将生成的 public 文件夹内的内容 push 到 <code>username.github.io</code> 中完成部署。</p>
 <p>由于我买了域名，这样做每次都把我的 CNAME 搞没了，我就在 yml 文件中手动加了一个 step，每次重新生成 CNAME 文件。</p>
-<h2 id="todo">TODO</h2>
+<p>为了更懒一点，又写了个脚本 deploy.sh:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-sh" data-lang="sh"><span style="color:#ff79c6">#!/bin/sh
+</span><span style="color:#ff79c6"></span>git add .
+<span style="color:#8be9fd;font-style:italic">msg</span><span style="color:#ff79c6">=</span><span style="color:#f1fa8c">&#34;rebuilding site </span><span style="color:#ff79c6">$(</span>date<span style="color:#ff79c6">)</span><span style="color:#f1fa8c">&#34;</span>
+<span style="color:#ff79c6">if</span> <span style="color:#ff79c6">[</span> -n <span style="color:#f1fa8c">&#34;</span><span style="color:#8be9fd;font-style:italic">$*</span><span style="color:#f1fa8c">&#34;</span> <span style="color:#ff79c6">]</span>; <span style="color:#ff79c6">then</span>
+	<span style="color:#8be9fd;font-style:italic">msg</span><span style="color:#ff79c6">=</span><span style="color:#f1fa8c">&#34;</span><span style="color:#8be9fd;font-style:italic">$*</span><span style="color:#f1fa8c">&#34;</span>
+<span style="color:#ff79c6">fi</span>
+git commit -m <span style="color:#f1fa8c">&#34;</span><span style="color:#8be9fd;font-style:italic">$msg</span><span style="color:#f1fa8c">&#34;</span>
+<span style="color:#6272a4"># Push source and build repos.</span>
+git push
+</code></pre></div><h2 id="todo">TODO</h2>
 <ul>
 <li>考虑弄个 CDN</li>
 </ul>

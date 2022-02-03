@@ -828,7 +828,17 @@ git push
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;此外还需要新建一对SSH密钥。私钥写入博客源文件仓库的 &lt;code&gt;Settings&lt;/code&gt; - &lt;code&gt;Actions secrets&lt;/code&gt;，命名为 &lt;code&gt;ACTIONS_DEPLOY_KEY&lt;/code&gt;，公钥写入静态网站仓库的 &lt;code&gt;Settings&lt;/code&gt; - &lt;code&gt;Deploy keys&lt;/code&gt;，命名随意。&lt;/p&gt;
 &lt;p&gt;之后将本地博客源文件 push 至 &lt;code&gt;my-hugo-stack&lt;/code&gt; 的 master 分支就会触发 action，自动部署并将生成的 public 文件夹内的内容 push 到 &lt;code&gt;username.github.io&lt;/code&gt; 中完成部署。&lt;/p&gt;
 &lt;p&gt;由于我买了域名，这样做每次都把我的 CNAME 搞没了，我就在 yml 文件中手动加了一个 step，每次重新生成 CNAME 文件。&lt;/p&gt;
-&lt;h2 id=&#34;todo&#34;&gt;TODO&lt;/h2&gt;
+&lt;p&gt;为了更懒一点，又写了个脚本 deploy.sh:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-sh&#34; data-lang=&#34;sh&#34;&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;#!/bin/sh
+&lt;/span&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;&lt;/span&gt;git add .
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;msg&lt;/span&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;rebuilding site &lt;/span&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;$(&lt;/span&gt;date&lt;span style=&#34;color:#ff79c6&#34;&gt;)&lt;/span&gt;&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;&lt;/span&gt;
+&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;[&lt;/span&gt; -n &lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;&lt;/span&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;$*&lt;/span&gt;&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;]&lt;/span&gt;; &lt;span style=&#34;color:#ff79c6&#34;&gt;then&lt;/span&gt;
+	&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;msg&lt;/span&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;&lt;/span&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;$*&lt;/span&gt;&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;&lt;/span&gt;
+&lt;span style=&#34;color:#ff79c6&#34;&gt;fi&lt;/span&gt;
+git commit -m &lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;&lt;/span&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;$msg&lt;/span&gt;&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;&lt;/span&gt;
+&lt;span style=&#34;color:#6272a4&#34;&gt;# Push source and build repos.&lt;/span&gt;
+git push
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h2 id=&#34;todo&#34;&gt;TODO&lt;/h2&gt;
 &lt;ul&gt;
 &lt;li&gt;考虑弄个 CDN&lt;/li&gt;
 &lt;/ul&gt;
