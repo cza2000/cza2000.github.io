@@ -8,30 +8,39 @@
     <language>zh-CN</language>
     <lastBuildDate>Thu, 03 Feb 2022 15:06:21 +0800</lastBuildDate><atom:link href="https://cza2000.github.io/categories/mit-6.824/index.xml" rel="self" type="application/rss+xml" />
     <item>
-      <title>mit-6.824 Spring 2021 lab3: RaftKV</title>
-      <link>https://cza2000.github.io/2022/mit-6.824-spring-2021-lab3-raftkv/</link>
+      <title>mit-6.824 lab3: RaftKV</title>
+      <link>https://cza2000.github.io/2022/mit-6.824-lab3-raftkv/</link>
       <pubDate>Thu, 03 Feb 2022 15:06:21 +0800</pubDate>
       
-      <guid>https://cza2000.github.io/2022/mit-6.824-spring-2021-lab3-raftkv/</guid>
+      <guid>https://cza2000.github.io/2022/mit-6.824-lab3-raftkv/</guid>
       <description>Lab3: KVRaft lab链接 https://pdos.csail.mit.edu/6.824/labs/lab-kvraft.html 本次lab中我们需要使用lab2中实现的Raft库来构建一个可容错的 Key/Value 存储服务，要求其对外提供强一致性（Strong cons</description>
     </item>
     
     <item>
-      <title>mit-6.824 Spring 2021 lab2: Raft</title>
-      <link>https://cza2000.github.io/2022/mit-6.824-spring-2021-lab2-raft/</link>
+      <title>mit-6.824 lab2: Raft</title>
+      <link>https://cza2000.github.io/2022/mit-6.824-lab2-raft/</link>
       <pubDate>Thu, 03 Feb 2022 15:04:30 +0800</pubDate>
       
-      <guid>https://cza2000.github.io/2022/mit-6.824-spring-2021-lab2-raft/</guid>
+      <guid>https://cza2000.github.io/2022/mit-6.824-lab2-raft/</guid>
       <description>Lab2: Raft lab原链接 https://pdos.csail.mit.edu/6.824/labs/lab-raft.html Raft是一种基于复制的状态机协议，通过在多个副本服务器上存储其状态（即数据）的完整副本来实现容错。 Raft将客户端请求组</description>
     </item>
     
     <item>
-      <title>mit-6.824 Spring 2021 lab1: MapReduce</title>
-      <link>https://cza2000.github.io/2022/mit-6.824-spring-2021-lab1-mapreduce/</link>
+      <title>mit-6.824 lab1: MapReduce</title>
+      <link>https://cza2000.github.io/2022/mit-6.824-lab1-mapreduce/</link>
       <pubDate>Thu, 03 Feb 2022 15:01:24 +0800</pubDate>
       
-      <guid>https://cza2000.github.io/2022/mit-6.824-spring-2021-lab1-mapreduce/</guid>
+      <guid>https://cza2000.github.io/2022/mit-6.824-lab1-mapreduce/</guid>
       <description>Lab1: MapReduce 在本次lab中我们的任务是实现一个分布式的MapReduce，它由两个程序组成，Coordinator和Worker。只有一个Coord</description>
+    </item>
+    
+    <item>
+      <title>mit-6.824 lab0: Preface</title>
+      <link>https://cza2000.github.io/2022/mit-6.824-lab0-preface/</link>
+      <pubDate>Thu, 03 Feb 2022 14:01:24 +0800</pubDate>
+      
+      <guid>https://cza2000.github.io/2022/mit-6.824-lab0-preface/</guid>
+      <description>前言 21年的3月份，大三下学期，我收到了一份暑期实习的offer。需要提前学习一下go语言，之后在某学长的安利下我了解到了mit-6.824</description>
     </item>
     
   </channel>

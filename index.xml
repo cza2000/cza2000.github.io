@@ -7,11 +7,11 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>zh-CN</language>
         <lastBuildDate>Thu, 03 Feb 2022 15:06:21 +0800</lastBuildDate><atom:link href="https://cza2000.github.io/index.xml" rel="self" type="application/rss+xml" /><item>
-        <title>mit-6.824 Spring 2021 lab3: RaftKV</title>
-        <link>https://cza2000.github.io/2022/mit-6.824-spring-2021-lab3-raftkv/</link>
+        <title>mit-6.824 lab3: RaftKV</title>
+        <link>https://cza2000.github.io/2022/mit-6.824-lab3-raftkv/</link>
         <pubDate>Thu, 03 Feb 2022 15:06:21 +0800</pubDate>
         
-        <guid>https://cza2000.github.io/2022/mit-6.824-spring-2021-lab3-raftkv/</guid>
+        <guid>https://cza2000.github.io/2022/mit-6.824-lab3-raftkv/</guid>
         <description>&lt;h1 id=&#34;lab3-kvraft&#34;&gt;Lab3: KVRaft&lt;/h1&gt;
 &lt;p&gt;lab链接 &lt;a class=&#34;link&#34; href=&#34;https://pdos.csail.mit.edu/6.824/labs/lab-kvraft.html&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;https://pdos.csail.mit.edu/6.824/labs/lab-kvraft.html&lt;/a&gt;&lt;/p&gt;
@@ -200,14 +200,71 @@
 }
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h3 id=&#34;snapshot&#34;&gt;snapshot&lt;/h3&gt;
 &lt;p&gt;part B中要求我们在raft state size达到阈值时给raft层下发快照。快照中不仅需要包含KV状态机，还需要包含lastSessions客户端请求去重表。由于快照是和lastIncludeIndex对应的，所以需要由applier协程在将对应的index的日志应用于状态机后继续阻塞的生成快照。&lt;/p&gt;
-</description>
+&lt;h2 id=&#34;测试结果&#34;&gt;测试结果&lt;/h2&gt;
+&lt;h3 id=&#34;3a&#34;&gt;3A&lt;/h3&gt;
+&lt;pre tabindex=&#34;0&#34;&gt;&lt;code class=&#34;language-log&#34; data-lang=&#34;log&#34;&gt;Test: one client (3A) ...
+  ... Passed --  15.1  5  9881  941
+Test: ops complete fast enough (3A) ...
+  ... Passed --  15.5  3  7032    0
+Test: many clients (3A) ...
+  ... Passed --  15.6  5 11160 1171
+Test: unreliable net, many clients (3A) ...
+  ... Passed --  16.2  5  7462  901
+Test: concurrent append to same key, unreliable (3A) ...
+  ... Passed --   1.5  3   282   52
+Test: progress in majority (3A) ...
+  ... Passed --   1.1  5   108    2
+Test: no progress in minority (3A) ...
+  ... Passed --   1.0  5   184    3
+Test: completion after heal (3A) ...
+  ... Passed --   1.0  5    63    3
+Test: partitions, one client (3A) ...
+  ... Passed --  22.5  5  9323  643
+Test: partitions, many clients (3A) ...
+  ... Passed --  23.3  5 18230  837
+Test: restarts, one client (3A) ...
+  ... Passed --  22.0  5 12689  822
+Test: restarts, many clients (3A) ...
+  ... Passed --  22.9  5 24109 1144
+Test: unreliable net, restarts, many clients (3A) ...
+  ... Passed --  25.7  5  9398  873
+Test: restarts, partitions, many clients (3A) ...
+  ... Passed --  30.3  5 19984  848
+Test: unreliable net, restarts, partitions, many clients (3A) ...
+  ... Passed --  29.9  5  7443  622
+Test: unreliable net, restarts, partitions, random keys, many clients (3A) ...
+  ... Passed --  32.9  7 14185  904
+PASS
+ok  	6.824/kvraft	277.625s
+&lt;/code&gt;&lt;/pre&gt;&lt;h3 id=&#34;3b&#34;&gt;3B&lt;/h3&gt;
+&lt;pre tabindex=&#34;0&#34;&gt;&lt;code class=&#34;language-log&#34; data-lang=&#34;log&#34;&gt;Test: InstallSnapshot RPC (3B) ...
+  ... Passed --   3.4  3  2151   63
+Test: snapshot size is reasonable (3B) ...
+  ... Passed --   2.8  3  5727  800
+Test: ops complete fast enough (3B) ...
+  ... Passed --   3.2  3  6962    0
+Test: restarts, snapshots, one client (3B) ...
+  ... Passed --  21.2  5 46519 4431
+Test: restarts, snapshots, many clients (3B) ...
+  ... Passed --  21.6  5 53053 4531
+Test: unreliable net, snapshots, many clients (3B) ...
+  ... Passed --  15.9  5 11057 1341
+Test: unreliable net, restarts, snapshots, many clients (3B) ...
+  ... Passed --  22.3  5 12478 1412
+Test: unreliable net, restarts, partitions, snapshots, many clients (3B) ...
+  ... Passed --  29.6  5  8653  760
+Test: unreliable net, restarts, partitions, snapshots, random keys, many clients (3B) ...
+  ... Passed --  31.6  7 25416 1802
+PASS
+ok  	6.824/kvraft	151.660s
+&lt;/code&gt;&lt;/pre&gt;</description>
         </item>
         <item>
-        <title>mit-6.824 Spring 2021 lab2: Raft</title>
-        <link>https://cza2000.github.io/2022/mit-6.824-spring-2021-lab2-raft/</link>
+        <title>mit-6.824 lab2: Raft</title>
+        <link>https://cza2000.github.io/2022/mit-6.824-lab2-raft/</link>
         <pubDate>Thu, 03 Feb 2022 15:04:30 +0800</pubDate>
         
-        <guid>https://cza2000.github.io/2022/mit-6.824-spring-2021-lab2-raft/</guid>
+        <guid>https://cza2000.github.io/2022/mit-6.824-lab2-raft/</guid>
         <description>&lt;h1 id=&#34;lab2-raft&#34;&gt;Lab2: Raft&lt;/h1&gt;
 &lt;p&gt;lab原链接 &lt;a class=&#34;link&#34; href=&#34;https://pdos.csail.mit.edu/6.824/labs/lab-raft.html&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;https://pdos.csail.mit.edu/6.824/labs/lab-raft.html&lt;/a&gt;&lt;/p&gt;
@@ -572,14 +629,75 @@
 }
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;需要注意因为写channel时是不加锁的，而写channel是可能出现并发的，可能存在一种情况：applier在写入一批旧日志时，follower接受leader的 &lt;code&gt;InstallSnapshot&lt;/code&gt; 之后将新的snapshot写入channel。此时channel的写入顺序可能是：旧日志1 -&amp;gt; 新快照 -&amp;gt; 旧日志2。&lt;/p&gt;
 &lt;p&gt;service层读channel是线性的，在读出snapshot并调用 &lt;code&gt;CondInstallSnapshot&lt;/code&gt; 后会更新raft层的lastApplied、commitIndex。因此在raft层apply完日志之后，重新获得锁去更新lastApplied时要注意不能回退，在这二者之间可能service层已经对更新的快照调用过 &lt;code&gt;CondInstallSnapshot&lt;/code&gt; 了（新快照的 lastIncludeIndex 一定大于 commitIndex ）。&lt;/p&gt;
-</description>
+&lt;h2 id=&#34;测试结果&#34;&gt;测试结果&lt;/h2&gt;
+&lt;h3 id=&#34;2a&#34;&gt;2A&lt;/h3&gt;
+&lt;pre tabindex=&#34;0&#34;&gt;&lt;code class=&#34;language-log&#34; data-lang=&#34;log&#34;&gt;Test (2A): initial election ...
+  ... Passed --   3.6  3   46   12142    0
+Test (2A): election after network failure ...
+  ... Passed --   5.6  3   94   19292    0
+Test (2A): multiple elections ...
+  ... Passed --   7.9  7  534  113432    0
+PASS
+ok  	6.824/raft	17.177s
+&lt;/code&gt;&lt;/pre&gt;&lt;h3 id=&#34;2b&#34;&gt;2B&lt;/h3&gt;
+&lt;pre tabindex=&#34;0&#34;&gt;&lt;code&gt;Test (2B): basic agreement ...
+  ... Passed --   1.1  3   16    4326    3
+Test (2B): RPC byte count ...
+  ... Passed --   1.3  3   48  153910   11
+Test (2B): agreement despite follower disconnection ...
+  ... Passed --   4.3  3   75   19840    7
+Test (2B): no agreement if too many followers disconnect ...
+  ... Passed --   4.7  5  146   33983    4
+Test (2B): concurrent Start()s ...
+  ... Passed --   1.5  3   18    5054    6
+Test (2B): rejoin of partitioned leader ...
+  ... Passed --   5.1  3  117   27458    4
+Test (2B): leader backs up quickly over incorrect follower logs ...
+  ... Passed --   9.8  5 1023  627193  102
+Test (2B): RPC counts aren&#39;t too high ...
+  ... Passed --   3.0  3   42   12296   12
+PASS
+ok  	6.824/raft	30.976s
+&lt;/code&gt;&lt;/pre&gt;&lt;h3 id=&#34;2c&#34;&gt;2C&lt;/h3&gt;
+&lt;pre tabindex=&#34;0&#34;&gt;&lt;code&gt;Test (2C): basic persistence ...
+  ... Passed --   6.0  3   91   21819    6
+Test (2C): more persistence ...
+  ... Passed --  18.3  5  821  178397   16
+Test (2C): partitioned leader and one follower crash, leader restarts ...
+  ... Passed --   2.7  3   35    8235    4
+Test (2C): Figure 8 ...
+  ... Passed --  27.9  5  530  117688   23
+Test (2C): unreliable agreement ...
+  ... Passed --   3.0  5  753  240518  246
+Test (2C): Figure 8 (unreliable) ...
+  ... Passed --  36.6  5 1684 3862021  145
+Test (2C): churn ...
+  ... Passed --  16.5  5 7937 3098958 1199
+Test (2C): unreliable churn ...
+  ... Passed --  16.3  5 1631 1031494  298
+PASS
+ok  	6.824/raft	127.309s
+&lt;/code&gt;&lt;/pre&gt;&lt;h3 id=&#34;2d&#34;&gt;2D&lt;/h3&gt;
+&lt;pre tabindex=&#34;0&#34;&gt;&lt;code&gt;Test (2D): snapshots basic ...
+  ... Passed --   2.4  3  247   96514  251
+Test (2D): install snapshots (disconnect) ...
+  ... Passed --  46.7  3 1035  293753  399
+Test (2D): install snapshots (disconnect+unreliable) ...
+  ... Passed --  52.4  3 1153  310385  377
+Test (2D): install snapshots (crash) ...
+  ... Passed --  32.0  3  722  206681  322
+Test (2D): install snapshots (unreliable+crash) ...
+  ... Passed --  43.7  3  806  220815  388
+PASS
+ok  	6.824/raft	177.243s
+&lt;/code&gt;&lt;/pre&gt;</description>
         </item>
         <item>
-        <title>mit-6.824 Spring 2021 lab1: MapReduce</title>
-        <link>https://cza2000.github.io/2022/mit-6.824-spring-2021-lab1-mapreduce/</link>
+        <title>mit-6.824 lab1: MapReduce</title>
+        <link>https://cza2000.github.io/2022/mit-6.824-lab1-mapreduce/</link>
         <pubDate>Thu, 03 Feb 2022 15:01:24 +0800</pubDate>
         
-        <guid>https://cza2000.github.io/2022/mit-6.824-spring-2021-lab1-mapreduce/</guid>
+        <guid>https://cza2000.github.io/2022/mit-6.824-lab1-mapreduce/</guid>
         <description>&lt;h1 id=&#34;lab1-mapreduce&#34;&gt;Lab1: MapReduce&lt;/h1&gt;
 &lt;p&gt;在本次lab中我们的任务是实现一个分布式的MapReduce，它由两个程序组成，Coordinator和Worker。只有一个Coordinator，一个或多个Worker并行执行。&lt;/p&gt;
 &lt;p&gt;每个Worker将通过RPC与Coordinator通信以请求一个Map或Reduce任务，之后从一个或多个文件中读取任务的输入，执行任务，并将任务的输出写入一个或多个文件。&lt;/p&gt;
@@ -739,6 +857,65 @@
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;执行Map任务时，只需将mapf函数产生的中间文件kv pair按照ihash(kv.Key)%nReduce的余数写入不同的文件等待Reduce即可。写入的文件要先调用ioutil.TempFile(&amp;quot;&amp;quot;, &amp;ldquo;temp&amp;rdquo;)生成再调用os.Rename()改为mr-i-j。&lt;/p&gt;
 &lt;p&gt;执行Reduce任务时，先建立一个kv数组，再将所有中间文件中的kv pair append到数组中再排序，将相同key对应的所有value append到一个string数组中，喂给reducef函数执行。看起来非常暴力，在工业界应该不可行，但通过本次lab的测试足够了。&lt;/p&gt;
 </description>
+        </item>
+        <item>
+        <title>mit-6.824 lab0: Preface</title>
+        <link>https://cza2000.github.io/2022/mit-6.824-lab0-preface/</link>
+        <pubDate>Thu, 03 Feb 2022 14:01:24 +0800</pubDate>
+        
+        <guid>https://cza2000.github.io/2022/mit-6.824-lab0-preface/</guid>
+        <description>&lt;h2 id=&#34;前言&#34;&gt;前言&lt;/h2&gt;
+&lt;p&gt;21年的3月份，大三下学期，我收到了一份暑期实习的offer。需要提前学习一下go语言，之后在某学长的安利下我了解到了mit-6.824这门课程，他建议我做一下这门课的4个lab就当实践一下go。不过我配好环境后就去浪了2333，也就断断续续的在b站上看了几期课的视频。&lt;/p&gt;
+&lt;p&gt;真正开始写lab还是暑假实习在公司摸鱼的时候开始的，当时还拉着旁边组的一个实习生一起写相互交流进度。不得不说，课程、论文和lab真的都是非常非常的硬核（虽然我论文只大概看了前几篇），分布式系统这个领域也真的是非常非常的有趣，比学校里学的东西不知道高到哪里去了。暑假结束时还只写完了lab2，lab3只写了一点点，之后由于搞完秋招后一直在玩，年底又去写PingCAP talent-plan的tinykv了（这个也挺有意思的，也更贴近工业界，可惜文档给的太少，与之相比6.824的实现就像个玩具）导致进度很慢，最终22年1月中旬才全部写完。&lt;/p&gt;
+&lt;p&gt;最近（毕业之前）我应该会将整理完所有的文档、实现思路发出来，也锻炼一下自己写技术文章的水平。&lt;/p&gt;
+&lt;h2 id=&#34;一些资料&#34;&gt;一些资料&lt;/h2&gt;
+&lt;h3 id=&#34;我的实验配置&#34;&gt;我的实验配置&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;win10 + wsl2 + ubuntu 20.04&lt;/li&gt;
+&lt;li&gt;16G内存&lt;/li&gt;
+&lt;li&gt;go version 1.15&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;课程网站&#34;&gt;课程网站&lt;/h3&gt;
+&lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;http://nil.csail.mit.edu/6.824/2021/schedule.html&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;6.824 Schedule: Spring 2021&lt;/a&gt;&lt;/p&gt;
+&lt;h3 id=&#34;用于并发测试的脚本&#34;&gt;用于并发测试的脚本&lt;/h3&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-sh&#34; data-lang=&#34;sh&#34;&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;#!/bin/bash
+&lt;/span&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;&lt;/span&gt;rm -rf tmp-&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;$1&lt;/span&gt;
+mkdir tmp-&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;$1&lt;/span&gt;
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;start_time&lt;/span&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;$(&lt;/span&gt;date + %s&lt;span style=&#34;color:#ff79c6&#34;&gt;)&lt;/span&gt;
+&lt;span style=&#34;color:#ff79c6&#34;&gt;[&lt;/span&gt; -e /tmp/fd1 &lt;span style=&#34;color:#ff79c6&#34;&gt;]&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;||&lt;/span&gt; mkfifo /tmp/fd1
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;exec&lt;/span&gt; 3&amp;lt;&amp;gt;/tmp/fd1
+rm -rf /tmp/fd1
+&lt;span style=&#34;color:#6272a4&#34;&gt;# 同时执行 10 个线程，依照cpu核心数视情况而定&lt;/span&gt;
+&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;((&lt;/span&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;i&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; 1; i &amp;lt;&lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; 10; i++&lt;span style=&#34;color:#ff79c6&#34;&gt;))&lt;/span&gt;; &lt;span style=&#34;color:#ff79c6&#34;&gt;do&lt;/span&gt;
+  &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;echo&lt;/span&gt; &amp;gt;&amp;amp;&lt;span style=&#34;color:#bd93f9&#34;&gt;3&lt;/span&gt;
+&lt;span style=&#34;color:#ff79c6&#34;&gt;done&lt;/span&gt;
+
+&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;((&lt;/span&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;i&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; 1; i &amp;lt;&lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; 500; i++&lt;span style=&#34;color:#ff79c6&#34;&gt;))&lt;/span&gt;; &lt;span style=&#34;color:#ff79c6&#34;&gt;do&lt;/span&gt;
+  &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;read&lt;/span&gt; -u3
+  &lt;span style=&#34;color:#ff79c6&#34;&gt;{&lt;/span&gt;
+	touch ./tmp-&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;$1&lt;/span&gt;/report_&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;$i&lt;/span&gt;.log
+    go &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;test&lt;/span&gt; -run &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;$1&lt;/span&gt; -race &amp;gt; ./tmp-&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;$1&lt;/span&gt;/report_&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;$i&lt;/span&gt;.log
+	&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;s&lt;/span&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;$(&lt;/span&gt;tail -n &lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt; ./tmp-&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;$1&lt;/span&gt;/report_&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;$i&lt;/span&gt;.log&lt;span style=&#34;color:#ff79c6&#34;&gt;)&lt;/span&gt;
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;[&lt;/span&gt; &lt;span style=&#34;color:#f1fa8c&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;s&lt;/span&gt;:&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;0&lt;/span&gt;:&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;2&lt;/span&gt;&lt;span style=&#34;color:#f1fa8c&#34;&gt;}&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; &lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#39;ok&amp;#39;&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;]&lt;/span&gt;
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;then&lt;/span&gt;
+		rm ./tmp-&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;$1&lt;/span&gt;/report_&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;$i&lt;/span&gt;.log
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;else&lt;/span&gt;
+		&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;echo&lt;/span&gt; &lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;test &lt;/span&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;$i&lt;/span&gt;&lt;span style=&#34;color:#f1fa8c&#34;&gt; Failed&amp;#34;&lt;/span&gt;
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;fi&lt;/span&gt;
+
+    &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;echo&lt;/span&gt; &amp;gt;&amp;amp;&lt;span style=&#34;color:#bd93f9&#34;&gt;3&lt;/span&gt;
+  &lt;span style=&#34;color:#ff79c6&#34;&gt;}&lt;/span&gt; &amp;amp;
+&lt;span style=&#34;color:#ff79c6&#34;&gt;done&lt;/span&gt;
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;wait&lt;/span&gt;
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;stop_time&lt;/span&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;$(&lt;/span&gt;date +%s&lt;span style=&#34;color:#ff79c6&#34;&gt;)&lt;/span&gt;
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;echo&lt;/span&gt; &lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;TIME:&lt;/span&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;$(&lt;/span&gt;expr &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;$stop_time&lt;/span&gt; - &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;$start_time&lt;/span&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;)&lt;/span&gt;&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;&lt;/span&gt;
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;exec&lt;/span&gt; 3&amp;lt;&amp;amp;-
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;exec&lt;/span&gt; 3&amp;gt;&amp;amp;-
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;</description>
         </item>
         <item>
         <title>Hugo&amp;Stack &#43; Github Pages &#43; Github Actions 建站记录</title>

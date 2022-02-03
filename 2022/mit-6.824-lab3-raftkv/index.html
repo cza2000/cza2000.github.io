@@ -1,16 +1,16 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
     <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content='实现一个基于Raft的KV分布式存储服务'><title>mit-6.824 Spring 2021 lab3: RaftKV</title>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content='实现一个基于Raft的KV分布式存储服务'><title>mit-6.824 lab3: RaftKV</title>
 
-<link rel='canonical' href='https://cza2000.github.io/2022/mit-6.824-spring-2021-lab3-raftkv/'>
+<link rel='canonical' href='https://cza2000.github.io/2022/mit-6.824-lab3-raftkv/'>
 
-<link rel="stylesheet" href="/scss/style.min.0f551e1e8f12e484db7a1602fcb8eced03029344f0e9cedaf9073100eb80d3e8.css"><meta property='og:title' content='mit-6.824 Spring 2021 lab3: RaftKV'>
+<link rel="stylesheet" href="/scss/style.min.0f551e1e8f12e484db7a1602fcb8eced03029344f0e9cedaf9073100eb80d3e8.css"><meta property='og:title' content='mit-6.824 lab3: RaftKV'>
 <meta property='og:description' content='实现一个基于Raft的KV分布式存储服务'>
-<meta property='og:url' content='https://cza2000.github.io/2022/mit-6.824-spring-2021-lab3-raftkv/'>
+<meta property='og:url' content='https://cza2000.github.io/2022/mit-6.824-lab3-raftkv/'>
 <meta property='og:site_name' content='陈子桉的博客'>
 <meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='分布式系统' /><meta property='article:published_time' content='2022-02-03T15:06:21&#43;08:00'/><meta property='article:modified_time' content='2022-02-03T15:06:21&#43;08:00'/><meta property='og:image' content='https://cza2000.github.io/img/avatar.png' />
-<meta name="twitter:title" content="mit-6.824 Spring 2021 lab3: RaftKV">
+<meta name="twitter:title" content="mit-6.824 lab3: RaftKV">
 <meta name="twitter:description" content="实现一个基于Raft的KV分布式存储服务"><meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:image" content='https://cza2000.github.io/img/avatar.png' />
     </head>
@@ -74,7 +74,7 @@
     
 
     <h2 class="article-title">
-        <a href="/2022/mit-6.824-spring-2021-lab3-raftkv/">mit-6.824 Spring 2021 lab3: RaftKV</a>
+        <a href="/2022/mit-6.824-lab3-raftkv/">mit-6.824 lab3: RaftKV</a>
     </h2>
 
     
@@ -103,7 +103,7 @@
         
         <div>
             <time class="article-words">
-                2515字
+                2887字
             </time>
         </div>
         
@@ -303,7 +303,64 @@
 }
 </code></pre></div><h3 id="snapshot">snapshot</h3>
 <p>part B中要求我们在raft state size达到阈值时给raft层下发快照。快照中不仅需要包含KV状态机，还需要包含lastSessions客户端请求去重表。由于快照是和lastIncludeIndex对应的，所以需要由applier协程在将对应的index的日志应用于状态机后继续阻塞的生成快照。</p>
-
+<h2 id="测试结果">测试结果</h2>
+<h3 id="3a">3A</h3>
+<pre tabindex="0"><code class="language-log" data-lang="log">Test: one client (3A) ...
+  ... Passed --  15.1  5  9881  941
+Test: ops complete fast enough (3A) ...
+  ... Passed --  15.5  3  7032    0
+Test: many clients (3A) ...
+  ... Passed --  15.6  5 11160 1171
+Test: unreliable net, many clients (3A) ...
+  ... Passed --  16.2  5  7462  901
+Test: concurrent append to same key, unreliable (3A) ...
+  ... Passed --   1.5  3   282   52
+Test: progress in majority (3A) ...
+  ... Passed --   1.1  5   108    2
+Test: no progress in minority (3A) ...
+  ... Passed --   1.0  5   184    3
+Test: completion after heal (3A) ...
+  ... Passed --   1.0  5    63    3
+Test: partitions, one client (3A) ...
+  ... Passed --  22.5  5  9323  643
+Test: partitions, many clients (3A) ...
+  ... Passed --  23.3  5 18230  837
+Test: restarts, one client (3A) ...
+  ... Passed --  22.0  5 12689  822
+Test: restarts, many clients (3A) ...
+  ... Passed --  22.9  5 24109 1144
+Test: unreliable net, restarts, many clients (3A) ...
+  ... Passed --  25.7  5  9398  873
+Test: restarts, partitions, many clients (3A) ...
+  ... Passed --  30.3  5 19984  848
+Test: unreliable net, restarts, partitions, many clients (3A) ...
+  ... Passed --  29.9  5  7443  622
+Test: unreliable net, restarts, partitions, random keys, many clients (3A) ...
+  ... Passed --  32.9  7 14185  904
+PASS
+ok  	6.824/kvraft	277.625s
+</code></pre><h3 id="3b">3B</h3>
+<pre tabindex="0"><code class="language-log" data-lang="log">Test: InstallSnapshot RPC (3B) ...
+  ... Passed --   3.4  3  2151   63
+Test: snapshot size is reasonable (3B) ...
+  ... Passed --   2.8  3  5727  800
+Test: ops complete fast enough (3B) ...
+  ... Passed --   3.2  3  6962    0
+Test: restarts, snapshots, one client (3B) ...
+  ... Passed --  21.2  5 46519 4431
+Test: restarts, snapshots, many clients (3B) ...
+  ... Passed --  21.6  5 53053 4531
+Test: unreliable net, snapshots, many clients (3B) ...
+  ... Passed --  15.9  5 11057 1341
+Test: unreliable net, restarts, snapshots, many clients (3B) ...
+  ... Passed --  22.3  5 12478 1412
+Test: unreliable net, restarts, partitions, snapshots, many clients (3B) ...
+  ... Passed --  29.6  5  8653  760
+Test: unreliable net, restarts, partitions, snapshots, random keys, many clients (3B) ...
+  ... Passed --  31.6  7 25416 1802
+PASS
+ok  	6.824/kvraft	151.660s
+</code></pre>
 </section>
 
 
@@ -333,24 +390,36 @@
                 
                     
 <article class="">
-    <a href="/2022/mit-6.824-spring-2021-lab2-raft/">
+    <a href="/2022/mit-6.824-lab2-raft/">
         
         
 
         <div class="article-details">
-            <h2 class="article-title">mit-6.824 Spring 2021 lab2: Raft</h2>
+            <h2 class="article-title">mit-6.824 lab2: Raft</h2>
         </div>
     </a>
 </article>
                 
                     
 <article class="">
-    <a href="/2022/mit-6.824-spring-2021-lab1-mapreduce/">
+    <a href="/2022/mit-6.824-lab1-mapreduce/">
         
         
 
         <div class="article-details">
-            <h2 class="article-title">mit-6.824 Spring 2021 lab1: MapReduce</h2>
+            <h2 class="article-title">mit-6.824 lab1: MapReduce</h2>
+        </div>
+    </a>
+</article>
+                
+                    
+<article class="">
+    <a href="/2022/mit-6.824-lab0-preface/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">mit-6.824 lab0: Preface</h2>
         </div>
     </a>
 </article>
@@ -529,6 +598,12 @@
         <li><a href="#state-machine">state-machine</a></li>
         <li><a href="#rpc-handler">RPC handler</a></li>
         <li><a href="#snapshot">snapshot</a></li>
+      </ol>
+    </li>
+    <li><a href="#测试结果">测试结果</a>
+      <ol>
+        <li><a href="#3a">3A</a></li>
+        <li><a href="#3b">3B</a></li>
       </ol>
     </li>
   </ol>

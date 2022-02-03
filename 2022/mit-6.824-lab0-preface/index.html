@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content='一些前言以及总结'><title>mit-6.824 lab0: Preface</title>
+
+<link rel='canonical' href='https://cza2000.github.io/2022/mit-6.824-lab0-preface/'>
+
+<link rel="stylesheet" href="/scss/style.min.0f551e1e8f12e484db7a1602fcb8eced03029344f0e9cedaf9073100eb80d3e8.css"><meta property='og:title' content='mit-6.824 lab0: Preface'>
+<meta property='og:description' content='一些前言以及总结'>
+<meta property='og:url' content='https://cza2000.github.io/2022/mit-6.824-lab0-preface/'>
+<meta property='og:site_name' content='陈子桉的博客'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='分布式系统' /><meta property='article:published_time' content='2022-02-03T14:01:24&#43;08:00'/><meta property='article:modified_time' content='2022-02-03T14:01:24&#43;08:00'/><meta property='og:image' content='https://cza2000.github.io/img/avatar.png' />
+<meta name="twitter:title" content="mit-6.824 lab0: Preface">
+<meta name="twitter:description" content="一些前言以及总结"><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://cza2000.github.io/img/avatar.png' />
+    </head>
+    <body class="
+    article-page has-toc
+">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex 
+    
+        extended
+    
+">
+    
+        <div id="article-toolbar">
+            <a href="/" class="back-home">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="15 6 9 12 15 18" />
+</svg>
+
+
+
+                <span>Back</span>
+            </a>
+        </div>
+    
+<main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+    <header class="article-category">
+        
+        <a href="/categories/mit-6.824/" >
+            mit-6.824
+        </a>
+        
+    </header>
+    
+
+    <h2 class="article-title">
+        <a href="/2022/mit-6.824-lab0-preface/">mit-6.824 lab0: Preface</a>
+    </h2>
+
+    
+    <h3 class="article-subtitle">
+        一些前言以及总结
+    </h3>
+    
+
+    
+    <footer class="article-time">
+        
+        <div>
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+            <time class="article-time--published">Feb 03, 2022</time>
+        </div>
+        
+
+        
+        <div>
+            <time class="article-words">
+                604字
+            </time>
+        </div>
+        
+    </footer>
+    
+</div>
+</header>
+
+    <section class="article-content">
+    
+    
+    <h2 id="前言">前言</h2>
+<p>21年的3月份，大三下学期，我收到了一份暑期实习的offer。需要提前学习一下go语言，之后在某学长的安利下我了解到了mit-6.824这门课程，他建议我做一下这门课的4个lab就当实践一下go。不过我配好环境后就去浪了2333，也就断断续续的在b站上看了几期课的视频。</p>
+<p>真正开始写lab还是暑假实习在公司摸鱼的时候开始的，当时还拉着旁边组的一个实习生一起写相互交流进度。不得不说，课程、论文和lab真的都是非常非常的硬核（虽然我论文只大概看了前几篇），分布式系统这个领域也真的是非常非常的有趣，比学校里学的东西不知道高到哪里去了。暑假结束时还只写完了lab2，lab3只写了一点点，之后由于搞完秋招后一直在玩，年底又去写PingCAP talent-plan的tinykv了（这个也挺有意思的，也更贴近工业界，可惜文档给的太少，与之相比6.824的实现就像个玩具）导致进度很慢，最终22年1月中旬才全部写完。</p>
+<p>最近（毕业之前）我应该会将整理完所有的文档、实现思路发出来，也锻炼一下自己写技术文章的水平。</p>
+<h2 id="一些资料">一些资料</h2>
+<h3 id="我的实验配置">我的实验配置</h3>
+<ul>
+<li>win10 + wsl2 + ubuntu 20.04</li>
+<li>16G内存</li>
+<li>go version 1.15</li>
+</ul>
+<h3 id="课程网站">课程网站</h3>
+<p><a class="link" href="http://nil.csail.mit.edu/6.824/2021/schedule.html"  target="_blank" rel="noopener"
+    >6.824 Schedule: Spring 2021</a></p>
+<h3 id="用于并发测试的脚本">用于并发测试的脚本</h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-sh" data-lang="sh"><span style="color:#ff79c6">#!/bin/bash
+</span><span style="color:#ff79c6"></span>rm -rf tmp-<span style="color:#8be9fd;font-style:italic">$1</span>
+mkdir tmp-<span style="color:#8be9fd;font-style:italic">$1</span>
+
+<span style="color:#8be9fd;font-style:italic">start_time</span><span style="color:#ff79c6">=</span><span style="color:#ff79c6">$(</span>date + %s<span style="color:#ff79c6">)</span>
+<span style="color:#ff79c6">[</span> -e /tmp/fd1 <span style="color:#ff79c6">]</span> <span style="color:#ff79c6">||</span> mkfifo /tmp/fd1
+<span style="color:#8be9fd;font-style:italic">exec</span> 3&lt;&gt;/tmp/fd1
+rm -rf /tmp/fd1
+<span style="color:#6272a4"># 同时执行 10 个线程，依照cpu核心数视情况而定</span>
+<span style="color:#ff79c6">for</span> <span style="color:#ff79c6">((</span><span style="color:#8be9fd;font-style:italic">i</span> <span style="color:#ff79c6">=</span> 1; i &lt;<span style="color:#ff79c6">=</span> 10; i++<span style="color:#ff79c6">))</span>; <span style="color:#ff79c6">do</span>
+  <span style="color:#8be9fd;font-style:italic">echo</span> &gt;&amp;<span style="color:#bd93f9">3</span>
+<span style="color:#ff79c6">done</span>
+
+<span style="color:#ff79c6">for</span> <span style="color:#ff79c6">((</span><span style="color:#8be9fd;font-style:italic">i</span> <span style="color:#ff79c6">=</span> 1; i &lt;<span style="color:#ff79c6">=</span> 500; i++<span style="color:#ff79c6">))</span>; <span style="color:#ff79c6">do</span>
+  <span style="color:#8be9fd;font-style:italic">read</span> -u3
+  <span style="color:#ff79c6">{</span>
+	touch ./tmp-<span style="color:#8be9fd;font-style:italic">$1</span>/report_<span style="color:#8be9fd;font-style:italic">$i</span>.log
+    go <span style="color:#8be9fd;font-style:italic">test</span> -run <span style="color:#8be9fd;font-style:italic">$1</span> -race &gt; ./tmp-<span style="color:#8be9fd;font-style:italic">$1</span>/report_<span style="color:#8be9fd;font-style:italic">$i</span>.log
+	<span style="color:#8be9fd;font-style:italic">s</span><span style="color:#ff79c6">=</span><span style="color:#ff79c6">$(</span>tail -n <span style="color:#bd93f9">1</span> ./tmp-<span style="color:#8be9fd;font-style:italic">$1</span>/report_<span style="color:#8be9fd;font-style:italic">$i</span>.log<span style="color:#ff79c6">)</span>
+	<span style="color:#ff79c6">if</span> <span style="color:#ff79c6">[</span> <span style="color:#f1fa8c">${</span><span style="color:#8be9fd;font-style:italic">s</span>:<span style="color:#8be9fd;font-style:italic">0</span>:<span style="color:#8be9fd;font-style:italic">2</span><span style="color:#f1fa8c">}</span> <span style="color:#ff79c6">==</span> <span style="color:#f1fa8c">&#39;ok&#39;</span> <span style="color:#ff79c6">]</span>
+	<span style="color:#ff79c6">then</span>
+		rm ./tmp-<span style="color:#8be9fd;font-style:italic">$1</span>/report_<span style="color:#8be9fd;font-style:italic">$i</span>.log
+	<span style="color:#ff79c6">else</span>
+		<span style="color:#8be9fd;font-style:italic">echo</span> <span style="color:#f1fa8c">&#34;test </span><span style="color:#8be9fd;font-style:italic">$i</span><span style="color:#f1fa8c"> Failed&#34;</span>
+	<span style="color:#ff79c6">fi</span>
+
+    <span style="color:#8be9fd;font-style:italic">echo</span> &gt;&amp;<span style="color:#bd93f9">3</span>
+  <span style="color:#ff79c6">}</span> &amp;
+<span style="color:#ff79c6">done</span>
+<span style="color:#8be9fd;font-style:italic">wait</span>
+
+<span style="color:#8be9fd;font-style:italic">stop_time</span><span style="color:#ff79c6">=</span><span style="color:#ff79c6">$(</span>date +%s<span style="color:#ff79c6">)</span>
+
+<span style="color:#8be9fd;font-style:italic">echo</span> <span style="color:#f1fa8c">&#34;TIME:</span><span style="color:#ff79c6">$(</span>expr <span style="color:#8be9fd;font-style:italic">$stop_time</span> - <span style="color:#8be9fd;font-style:italic">$start_time</span><span style="color:#ff79c6">)</span><span style="color:#f1fa8c">&#34;</span>
+<span style="color:#8be9fd;font-style:italic">exec</span> 3&lt;&amp;-
+<span style="color:#8be9fd;font-style:italic">exec</span> 3&gt;&amp;-
+</code></pre></div>
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E5%88%86%E5%B8%83%E5%BC%8F%E7%B3%BB%E7%BB%9F/">分布式系统</a>
+        
+    </section>
+
+
+    </footer>
+
+
+    
+</article>
+
+    
+
+    <aside class="related-contents--wrapper">
+    
+    
+        <h2 class="section-title">Related contents</h2>
+        <div class="related-contents">
+            <div class="flex article-list--tile">
+                
+                    
+<article class="">
+    <a href="/2022/mit-6.824-lab3-raftkv/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">mit-6.824 lab3: RaftKV</h2>
+        </div>
+    </a>
+</article>
+                
+                    
+<article class="">
+    <a href="/2022/mit-6.824-lab2-raft/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">mit-6.824 lab2: Raft</h2>
+        </div>
+    </a>
+</article>
+                
+                    
+<article class="">
+    <a href="/2022/mit-6.824-lab1-mapreduce/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">mit-6.824 lab1: MapReduce</h2>
+        </div>
+    </a>
+</article>
+                
+            </div>
+        </div>
+    
+</aside>
+
+     
+    
+        
+    <script src="https://utteranc.es/client.js" 
+        repo="cza2000/cza2000.github.io"
+        issue-term="title"
+        
+        label="github-light"
+        
+        crossorigin="anonymous"
+        async
+        >
+</script>
+
+<style>
+    .utterances {
+        max-width: unset;
+    }
+</style>
+
+<script>
+    function setUtterancesTheme(theme) {
+        let utterances = document.querySelector('.utterances iframe');
+        if (utterances) {
+            utterances.contentWindow.postMessage(
+                {
+                    type: 'set-theme',
+                    theme: `github-${theme}`
+                },
+                'https://utteranc.es'
+            );
+        }
+    }
+
+    addEventListener('message', event => {
+        if (event.origin !== 'https://utteranc.es') return;
+        setUtterancesTheme(document.documentElement.dataset.scheme)
+    });
+
+    window.addEventListener('onColorSchemeChange', (e) => {
+        setUtterancesTheme(e.detail)
+    })
+</script>
+
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+            2020 - 
+        
+        2022 陈子桉的博客
+    </section>
+    
+    <section class="powerby">
+        Built with <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> <br />
+        Theme <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.7.0">Stack</a></b> designed by <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a>
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.css"integrity="sha256-c0uckgykQ9v5k&#43;IqViZOZKc47Jn7KQil4/MP3ySA3F8="crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.css"integrity="sha256-SBLU4vv6CA6lHsZ1XyTdhyjJxCjPif/TRkjnsyGAGnE="crossorigin="anonymous"
+            >
+
+            </main>
+    
+        <aside class="sidebar right-sidebar sticky">
+            <section class="widget archives">
+                <div class="widget-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+                </div>
+                <h2 class="widget-title section-title">Table of contents</h2>
+                
+                <div class="widget--toc">
+                    <nav id="TableOfContents">
+  <ol>
+    <li><a href="#前言">前言</a></li>
+    <li><a href="#一些资料">一些资料</a>
+      <ol>
+        <li><a href="#我的实验配置">我的实验配置</a></li>
+        <li><a href="#课程网站">课程网站</a></li>
+        <li><a href="#用于并发测试的脚本">用于并发测试的脚本</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+                </div>
+            </section>
+        </aside>
+    
+
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.5/dist/vibrant.min.js"integrity="sha256-5NovOZc4iwiAWTYIFiIM7DxKUXKWvpVEuMEPLzcm5/g="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>
