@@ -22,9 +22,7 @@
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
       
       <guid>https://cza2000.github.io/about/</guid>
-      <description>关于本人 陈子桉，西安交通大学计算机科学与技术专业大四在读。
-周董粉丝
-关于本站 托管于 Github pages，Powered by Hugo，Theme stack.</description>
+      <description>关于本人 陈子桉，西安交通大学计算机科学与技术专业大四在读。 周董粉丝 关于本站 托管于 Github pages，Powered by Hugo，Theme stack.</description>
     </item>
     
     <item>
@@ -33,8 +31,7 @@
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
       
       <guid>https://cza2000.github.io/links/</guid>
-      <description>Link format:
-links: - title: ZiannChen description: Hello world. website: https://ziannchen.work image: https://ziannchen.work/img/avatar_hue928ba88986321c664ad7f73d3c6ffe2_107334_300x0_resize_box_3.png image field accepts both local and external images.</description>
+      <description>Link format: links: - title: ZiannChen description: Hello world. website: https://ziannchen.work image: https://ziannchen.work/img/avatar_hue928ba88986321c664ad7f73d3c6ffe2_107334_300x0_resize_box_3.png image field accepts both local and external images.</description>
     </item>
     
     <item>

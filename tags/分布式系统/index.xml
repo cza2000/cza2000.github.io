@@ -13,15 +13,7 @@
       <pubDate>Thu, 03 Feb 2022 15:06:21 +0800</pubDate>
       
       <guid>https://cza2000.github.io/2022/mit-6.824-spring-2021-lab3-raftkv/</guid>
-      <description>Lab3: KVRaft lab链接 https://pdos.csail.mit.edu/6.824/labs/lab-kvraft.html
-本次lab中我们需要使用lab2中实现的Raft库来构建一个可容错的 Key/Value 存储服务，要求其对外提供强一致性（Strong consistency）。
-这个KV存储服务支持Get/Put/Append三种客户端操作。客户端通过RPC与集群中的leader通信，leader接收到请求后将其包装在一条Raft日志中下放到Raft层进行共识，日志被apply后返回客户端结果。
-一些思考 在PartA的描述中提到，leader在将一个请求下放到raft层之后，commit之前宕机，这时它无法回复Clerk。又或者是，这条日志成功commit，但返回的RPC丢失。Clerk在规定时间内没有收到结果，会向另一台主机（可能是新选出的leader）发送RPC，这条日志最终被commit之后又会被应用于状态机，从而状态机执行了两次相同的请求。
-这要求我们能够判断重复的请求。因此每个请求都需要被唯一标识，请求中需要加上（ClientID, RequestID），Clerk每次请求成功之后自增RequestID。
-我们还需要在遇到重复的请求时直接返回第一次请求时的结果，这需要我们保存每一个Clerk的最后一次请求的结果ClientID -&amp;gt; (RequestID, LastResponse)。只需要保存最后一次请求结果是因为如果服务端收到RequestID = x的RPC，说明这个Clerk已经收到了RequestID为[1, x-1]之间内的所有请求的结果，服务端如果再次收到这个RequestID在区间之内的请求说明该RPC过期，直接丢弃即可。
-client 我将3种请求共用了一个RPC，简化了逻辑。
-Clerk保存一个leaderID，请求失败了再换另一个server，请求成功了自增requestID。
-type Clerk struct { servers []*labrpc.ClientEnd // You will have to modify this struct. 	leaderID int clientID int64 requestID int } func (ck *Clerk) Get(key string) string { return ck.Command(key, &amp;#34;&amp;#34;, OpGet) } func (ck *Clerk) Put(key string, value string) { ck.Command(key, value, OpPut) } func (ck *Clerk) Append(key string, value string) { ck.</description>
+      <description>Lab3: KVRaft lab链接 https://pdos.csail.mit.edu/6.824/labs/lab-kvraft.html 本次lab中我们需要使用lab2中实现的Raft库来构建一个可容错的 Key/Value 存储服务，要求其对外提供强一致性（Strong cons</description>
     </item>
     
     <item>
@@ -30,13 +22,7 @@ type Clerk struct { servers []*labrpc.ClientEnd // You will have to modify this 
       <pubDate>Thu, 03 Feb 2022 15:04:30 +0800</pubDate>
       
       <guid>https://cza2000.github.io/2022/mit-6.824-spring-2021-lab2-raft/</guid>
-      <description>Lab2: Raft lab原链接 https://pdos.csail.mit.edu/6.824/labs/lab-raft.html
-Raft是一种基于复制的状态机协议，通过在多个副本服务器上存储其状态（即数据）的完整副本来实现容错。
-Raft将客户端请求组织成一个称为日志的序列，并通过复制确保所有副本服务器都看到相同的日志。每个副本按日志顺序执行客户端请求，并将它们应用于本地的状态机副本。由于所有副本服务器都看到相同的日志内容，因此它们都以相同的顺序执行相同的请求，从而继续具有相同的服务状态。如果服务器出现故障但随后恢复，Raft保证只要至少半数的服务器存活，并且可以相互通信，就可以保证正常对外服务。
-在本次lab中我们的任务是使用go语言实现raft。参考论文 raft-extended，我们需要实现除了集群成员变更之外的绝大部分内容。论文中我认为最核心的就是描述3个RPC的(Figure 2)这张图，我的实现大体上遵循了这张图。此外我也参考了一些工业级的raft实现，比如SOFAJraft、etcd，做了一些优化。在我秋招面试美团的一个做分布式存储的部门时，他们问了我很多关于raft的内容（虽然最后挂了）。
-有些需要注意的点：
- 当收到的RPC中的term大于自身时，无条件跟随term并转为follower，这在不同的RPC handler中的处理略有不同。 在lab的一些测试用例中，网络将是不稳定的，带来大量随机的RPC丢包、乱序、超时。对于过期的RPC，直接抛弃不处理即可。对于是否过期的判断体现在term太小、身份不正确之类（例如follow收到append entries response）。 锁的使用：在接发RPC、读写channel时一定不要持有锁，不然很有可能死锁。此外有许多代码块对Raft结构中各字段是只读的，我使用了读写锁。  结构体 Raft结构中的各个变量和论文大致一样。
-type Raft struct { rw sync.RWMutex // Lock to protect shared access to this peer&amp;#39;s state 	peers []*labrpc.ClientEnd // RPC end points of all peers 	persister *Persister // Object to hold this peer&amp;#39;s persisted state 	me int // this peer&amp;#39;s index into peers[] 	dead int32 // set by Kill() 	// Your data here (2A, 2B, 2C).</description>
+      <description>Lab2: Raft lab原链接 https://pdos.csail.mit.edu/6.824/labs/lab-raft.html Raft是一种基于复制的状态机协议，通过在多个副本服务器上存储其状态（即数据）的完整副本来实现容错。 Raft将客户端请求组</description>
     </item>
     
     <item>
@@ -45,15 +31,7 @@ type Raft struct { rw sync.RWMutex // Lock to protect shared access to this peer
       <pubDate>Thu, 03 Feb 2022 15:01:24 +0800</pubDate>
       
       <guid>https://cza2000.github.io/2022/mit-6.824-spring-2021-lab1-mapreduce/</guid>
-      <description>Lab1: MapReduce 在本次lab中我们的任务是实现一个分布式的MapReduce，它由两个程序组成，Coordinator和Worker。只有一个Coordinator，一个或多个Worker并行执行。
-每个Worker将通过RPC与Coordinator通信以请求一个Map或Reduce任务，之后从一个或多个文件中读取任务的输入，执行任务，并将任务的输出写入一个或多个文件。
-Coordinator应注意到Worker是否在合理的时间内（10s）完成了任务，如果没有则将相同的任务交给另一个Worker。
-Coordinator 写这个lab的时候刚学go语言不久，觉得channel这个东西很帅，就使用了很多channel实现了一个lock-free版本的Coordinator，实践了一下csp。
-核心结构体 Coordinator维护每一个Map和Reduce任务的状态，这样就不用维护每一个worker的状态，这也利于worker的弹性伸缩。
-xxxidCh用于在获取任务编号并发放给worker，xxxDoneCh和xxxUndoneCh用于获取完成或未完成的任务编号修改任务状态。
-type Coordinator struct { files []string nMap int nReduce int mapidCh chan int reduceidCh chan int mapStatus []Task reduceStatus []Task heartbeatCh chan heartbeatMsg reportCh chan reportMsg stateCh chan getStateMsg mapDoneCh chan Execution reduceDoneCh chan Execution mapUndoneCh chan Execution reduceUndoneCh chan Execution mapComplete bool reduceComplete bool mapRemain int reduceRemain int } 每个任务的状态有3种，每个任务被初始化时都是UnStarted，被分配给Worker之后转换为Processing，收到Report完成转为Done，未完成转为UnStarted。
-结构体Task用term和任务状态共同表示一个任务的信息，term代表该任务被分配给worker执行的次数。
-type TaskStatus int const ( UnStarted TaskStatus = iota Processing Done ) type Task struct { term int TaskStatus } RPC-handler Coordinator接收到RPC之后，包装出一个xxxMsg结构，传入RPC对应的channel中。</description>
+      <description>Lab1: MapReduce 在本次lab中我们的任务是实现一个分布式的MapReduce，它由两个程序组成，Coordinator和Worker。只有一个Coord</description>
     </item>
     
   </channel>
