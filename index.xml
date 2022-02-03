@@ -17,18 +17,6 @@
     &gt;https://pdos.csail.mit.edu/6.824/labs/lab-kvraft.html&lt;/a&gt;&lt;/p&gt;
 &lt;p&gt;本次lab中我们需要使用lab2中实现的Raft库来构建一个可容错的 Key/Value 存储服务，要求其对外提供强一致性（&lt;code&gt;Strong consistency&lt;/code&gt;）。&lt;/p&gt;
 &lt;p&gt;这个KV存储服务支持Get/Put/Append三种客户端操作。客户端通过RPC与集群中的leader通信，leader接收到请求后将其包装在一条Raft日志中下放到Raft层进行共识，日志被apply后返回客户端结果。&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;&lt;a class=&#34;link&#34; href=&#34;#lab3-kvraft&#34; &gt;Lab3: KVRaft&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a class=&#34;link&#34; href=&#34;#%e4%b8%80%e4%ba%9b%e6%80%9d%e8%80%83&#34; &gt;一些思考&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a class=&#34;link&#34; href=&#34;#client&#34; &gt;client&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a class=&#34;link&#34; href=&#34;#server&#34; &gt;server&lt;/a&gt;
-&lt;ul&gt;
-&lt;li&gt;&lt;a class=&#34;link&#34; href=&#34;#state-machine&#34; &gt;state-machine&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a class=&#34;link&#34; href=&#34;#rpc-handler&#34; &gt;RPC handler&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;a class=&#34;link&#34; href=&#34;#snapshot&#34; &gt;snapshot&lt;/a&gt;&lt;/li&gt;
-&lt;/ul&gt;
-&lt;/li&gt;
-&lt;/ul&gt;
 &lt;h2 id=&#34;一些思考&#34;&gt;一些思考&lt;/h2&gt;
 &lt;p&gt;在PartA的描述中提到，leader在将一个请求下放到raft层之后，commit之前宕机，这时它无法回复Clerk。又或者是，这条日志成功commit，但返回的RPC丢失。Clerk在规定时间内没有收到结果，会向另一台主机（可能是新选出的leader）发送RPC，这条日志最终被commit之后又会被应用于状态机，从而状态机执行了两次相同的请求。&lt;/p&gt;
 &lt;p&gt;这要求我们能够判断重复的请求。因此每个请求都需要被唯一标识，请求中需要加上（ClientID, RequestID），Clerk每次请求成功之后自增RequestID。&lt;/p&gt;

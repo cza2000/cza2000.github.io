@@ -16,12 +16,12 @@
       <description>Lab3: KVRaft lab链接 https://pdos.csail.mit.edu/6.824/labs/lab-kvraft.html
 本次lab中我们需要使用lab2中实现的Raft库来构建一个可容错的 Key/Value 存储服务，要求其对外提供强一致性（Strong consistency）。
 这个KV存储服务支持Get/Put/Append三种客户端操作。客户端通过RPC与集群中的leader通信，leader接收到请求后将其包装在一条Raft日志中下放到Raft层进行共识，日志被apply后返回客户端结果。
- Lab3: KVRaft 一些思考 client server  state-machine RPC handler snapshot    一些思考 在PartA的描述中提到，leader在将一个请求下放到raft层之后，commit之前宕机，这时它无法回复Clerk。又或者是，这条日志成功commit，但返回的RPC丢失。Clerk在规定时间内没有收到结果，会向另一台主机（可能是新选出的leader）发送RPC，这条日志最终被commit之后又会被应用于状态机，从而状态机执行了两次相同的请求。
+一些思考 在PartA的描述中提到，leader在将一个请求下放到raft层之后，commit之前宕机，这时它无法回复Clerk。又或者是，这条日志成功commit，但返回的RPC丢失。Clerk在规定时间内没有收到结果，会向另一台主机（可能是新选出的leader）发送RPC，这条日志最终被commit之后又会被应用于状态机，从而状态机执行了两次相同的请求。
 这要求我们能够判断重复的请求。因此每个请求都需要被唯一标识，请求中需要加上（ClientID, RequestID），Clerk每次请求成功之后自增RequestID。
 我们还需要在遇到重复的请求时直接返回第一次请求时的结果，这需要我们保存每一个Clerk的最后一次请求的结果ClientID -&amp;gt; (RequestID, LastResponse)。只需要保存最后一次请求结果是因为如果服务端收到RequestID = x的RPC，说明这个Clerk已经收到了RequestID为[1, x-1]之间内的所有请求的结果，服务端如果再次收到这个RequestID在区间之内的请求说明该RPC过期，直接丢弃即可。
 client 我将3种请求共用了一个RPC，简化了逻辑。
 Clerk保存一个leaderID，请求失败了再换另一个server，请求成功了自增requestID。
-type Clerk struct { servers []*labrpc.ClientEnd // You will have to modify this struct. 	leaderID int clientID int64 requestID int } func (ck *Clerk) Get(key string) string { return ck.Command(key, &amp;#34;&amp;#34;, OpGet) } func (ck *Clerk) Put(key string, value string) { ck.</description>
+type Clerk struct { servers []*labrpc.ClientEnd // You will have to modify this struct. 	leaderID int clientID int64 requestID int } func (ck *Clerk) Get(key string) string { return ck.Command(key, &amp;#34;&amp;#34;, OpGet) } func (ck *Clerk) Put(key string, value string) { ck.Command(key, value, OpPut) } func (ck *Clerk) Append(key string, value string) { ck.</description>
     </item>
     
     <item>

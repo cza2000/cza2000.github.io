@@ -128,18 +128,6 @@
     >https://pdos.csail.mit.edu/6.824/labs/lab-kvraft.html</a></p>
 <p>本次lab中我们需要使用lab2中实现的Raft库来构建一个可容错的 Key/Value 存储服务，要求其对外提供强一致性（<code>Strong consistency</code>）。</p>
 <p>这个KV存储服务支持Get/Put/Append三种客户端操作。客户端通过RPC与集群中的leader通信，leader接收到请求后将其包装在一条Raft日志中下放到Raft层进行共识，日志被apply后返回客户端结果。</p>
-<ul>
-<li><a class="link" href="#lab3-kvraft" >Lab3: KVRaft</a></li>
-<li><a class="link" href="#%e4%b8%80%e4%ba%9b%e6%80%9d%e8%80%83" >一些思考</a></li>
-<li><a class="link" href="#client" >client</a></li>
-<li><a class="link" href="#server" >server</a>
-<ul>
-<li><a class="link" href="#state-machine" >state-machine</a></li>
-<li><a class="link" href="#rpc-handler" >RPC handler</a></li>
-<li><a class="link" href="#snapshot" >snapshot</a></li>
-</ul>
-</li>
-</ul>
 <h2 id="一些思考">一些思考</h2>
 <p>在PartA的描述中提到，leader在将一个请求下放到raft层之后，commit之前宕机，这时它无法回复Clerk。又或者是，这条日志成功commit，但返回的RPC丢失。Clerk在规定时间内没有收到结果，会向另一台主机（可能是新选出的leader）发送RPC，这条日志最终被commit之后又会被应用于状态机，从而状态机执行了两次相同的请求。</p>
 <p>这要求我们能够判断重复的请求。因此每个请求都需要被唯一标识，请求中需要加上（ClientID, RequestID），Clerk每次请求成功之后自增RequestID。</p>
