@@ -6,7 +6,16 @@
     <description>Recent content in Posts on 陈子桉的博客</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>zh-CN</language>
-    <lastBuildDate>Thu, 03 Feb 2022 15:06:21 +0800</lastBuildDate><atom:link href="https://cza2000.github.io/post/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Fri, 04 Feb 2022 13:21:03 +0800</lastBuildDate><atom:link href="https://cza2000.github.io/post/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>mit-6.824 lab3: ShardKV</title>
+      <link>https://cza2000.github.io/2022/mit-6.824-lab3-shardkv/</link>
+      <pubDate>Fri, 04 Feb 2022 13:21:03 +0800</pubDate>
+      
+      <guid>https://cza2000.github.io/2022/mit-6.824-lab3-shardkv/</guid>
+      <description>lab课程网址 https://pdos.csail.mit.edu/6.824/labs/lab-shard.html 本次lab是最难的一次lab，很多地方需要我们自由发挥，不像lab2那样可以参考论文。 Lab2和Lab3构成基础分布式数据库</description>
+    </item>
+    
     <item>
       <title>mit-6.824 lab3: RaftKV</title>
       <link>https://cza2000.github.io/2022/mit-6.824-lab3-raftkv/</link>

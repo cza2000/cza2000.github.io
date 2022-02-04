@@ -6,7 +6,700 @@
         <description>Recent content on 陈子桉的博客</description>
         <generator>Hugo -- gohugo.io</generator>
         <language>zh-CN</language>
-        <lastBuildDate>Thu, 03 Feb 2022 15:06:21 +0800</lastBuildDate><atom:link href="https://cza2000.github.io/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Fri, 04 Feb 2022 13:21:03 +0800</lastBuildDate><atom:link href="https://cza2000.github.io/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>mit-6.824 lab3: ShardKV</title>
+        <link>https://cza2000.github.io/2022/mit-6.824-lab3-shardkv/</link>
+        <pubDate>Fri, 04 Feb 2022 13:21:03 +0800</pubDate>
+        
+        <guid>https://cza2000.github.io/2022/mit-6.824-lab3-shardkv/</guid>
+        <description>&lt;p&gt;lab课程网址 &lt;a class=&#34;link&#34; href=&#34;https://pdos.csail.mit.edu/6.824/labs/lab-shard.html&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;https://pdos.csail.mit.edu/6.824/labs/lab-shard.html&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;本次lab是最难的一次lab，很多地方需要我们自由发挥，不像lab2那样可以参考论文。&lt;/p&gt;
+&lt;p&gt;Lab2和Lab3构成基础分布式数据库的框架，实现了多节点间的数据一致性，支持crud，数据同步和快照保存。然而，由于所有的请求都需要由 leader 来处理，当数据增长到一定程度时，若仍然使用单一集群服务所有数据，leader面对的压力会非常大，请求响应时间也会延长，磁盘空间也会不足。在这种模式下，增加机器并不会带来性能的提升，反而存在浪费。一个非常直接的解决方法，就是将数据按照某种方式分开存储到不同的集群上，将不同的请求引流到不同的集群，降低单一集群的压力，提供更为高效、更为健壮的服务。&lt;/p&gt;
+&lt;p&gt;Lab4就是要实现数据的划分，将不同的数据划分到不同的集群上，保证相应数据请求引流到对应的集群。这里，将互不相交并且组成完整数据的每一个数据子集称为 Shard。在同一阶段中，Shard 与集群的对应关系称为 Config，随着时间的推移，增加或减少机器、某个 Shard 中的数据请求过热，Shard 需要在不同集群之中进行迁移。如何在 Config更新、 Shard 迁移的同时仍能正确对外提供强一致性的服务，是lab4主要挑战。&lt;/p&gt;
+&lt;p&gt;一个集群只有Leader才能服务，系统的性能与集群的数量成正比。lab3是一个集群，lab4要实现的是多个集群之间的配合。&lt;/p&gt;
+&lt;p&gt;我画了一个 ShardKV 最终的结构图&lt;/p&gt;
+&lt;p&gt;&lt;figure 
+	&gt;
+	&lt;a href=&#34;https://cza2000.github.io/img/ShardKV/1.png&#34; &gt;
+		&lt;img src=&#34;https://cza2000.github.io/img/ShardKV/1.png&#34;
+			
+			
+			
+			loading=&#34;lazy&#34;
+			alt=&#34;图片 1&#34;&gt;
+	&lt;/a&gt;
+	
+	&lt;figcaption&gt;图片 1&lt;/figcaption&gt;
+	
+&lt;/figure&gt;&lt;/p&gt;
+&lt;h2 id=&#34;shardctrler&#34;&gt;ShardCtrler&lt;/h2&gt;
+&lt;p&gt;Client 在向 Server 发送RPC之前，需要先知道目标 key 所在的 Shard 位于哪一个 Group，以及如何和这个 Group 中的leader通信。这就需要有一个地方保存 shard -&amp;gt; gid 和 gid -&amp;gt; server 信息，这就是lab4A中需要实现的 ShardCtrler，它使用 Config 结构保存这些信息。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;// A configuration -- an assignment of shards to groups.
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;// Please don&amp;#39;t change this.
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; Config &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	Num    &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;              &lt;span style=&#34;color:#6272a4&#34;&gt;// config number
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	Shards [NShards]&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;     &lt;span style=&#34;color:#6272a4&#34;&gt;// shard -&amp;gt; gid
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	Groups &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;][]&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt; &lt;span style=&#34;color:#6272a4&#34;&gt;// gid -&amp;gt; servers[]
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;每次 shard -&amp;gt; gid 的对应关系被更改时，ShardCtrler 创建一个新的 Config 保存新的对应关系。ShardCtrler 支持Join、Leave、Move、Query 4种RPC来添加新的 Group、删除 Group，在 Group 之间移动 Shard 以及查询对应 Num 的 Config，底层也使用Raft协议在多台机器上进行数据同步。因此整体实现和lab3类似。&lt;/p&gt;
+&lt;h3 id=&#34;client&#34;&gt;Client&lt;/h3&gt;
+&lt;p&gt;为了简化逻辑4种请求共用一个RPC，也需要加上 ClientID 和 RequestID 让 server 端能够去重。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; CommandRequest &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	ClientID  &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	RequestID &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	OpType
+	JoinArgs
+	LeaveArgs
+	MoveArgs
+	QueryArgs
+}
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; CommandResponse &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	Err         Err
+	Config      Config
+}
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; JoinArgs &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	Servers   &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;][]&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt; &lt;span style=&#34;color:#6272a4&#34;&gt;// new GID -&amp;gt; servers mappings
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;}
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; LeaveArgs &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	GIDs      []&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+}
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; MoveArgs &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	Shard     &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	GID       &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+}
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; QueryArgs &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	Num       &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt; &lt;span style=&#34;color:#6272a4&#34;&gt;// desired config number
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h3 id=&#34;server&#34;&gt;Server&lt;/h3&gt;
+&lt;p&gt;对于RPC的处理模型和lab3是一样的，由于Config数据较小，还不用处理快照。&lt;/p&gt;
+&lt;h4 id=&#34;join&#34;&gt;Join&lt;/h4&gt;
+&lt;p&gt;&lt;code&gt;Join&lt;/code&gt; 操作向当前配置中新增一些server，这些server可能被加入现有的 Group 中，也可能是新增的 Group。&lt;/p&gt;
+&lt;p&gt;新增的 Group 还没有 Shard，需要在 &lt;code&gt;Groups&lt;/code&gt; 中对 &lt;code&gt;Shards&lt;/code&gt; 进行平衡并且要产生尽可能少的 Shard 迁移，平衡的方法是每次循环让拥有 Shard 最多的 Group 分一个给拥有 Shard 最少的 Group，直到它们之间的差值小等于1。&lt;/p&gt;
+&lt;p&gt;ShardCtrler 刚启动时还没有 Config 信息，第一次执行 &lt;code&gt;Join&lt;/code&gt; 时所有的 Shard 还未被分配到具体的 Group 上，对应的 gid 是0，我称为 &lt;code&gt;zombieShard&lt;/code&gt;。因此在处理 &lt;code&gt;Join&lt;/code&gt; 时也要分配可能存在的 &lt;code&gt;zombieShard&lt;/code&gt;。此外maps数据需要深拷贝。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (sc &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;ShardCtrler) &lt;span style=&#34;color:#50fa7b&#34;&gt;executeJoin&lt;/span&gt;(servers &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;][]&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;) {
+	length &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;len&lt;/span&gt;(sc.configs)
+	lastConfig &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; sc.configs[length&lt;span style=&#34;color:#ff79c6&#34;&gt;-&lt;/span&gt;&lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt;]
+
+	newGroups &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;deepCopy&lt;/span&gt;(lastConfig.Groups)
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; gid, servers &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;range&lt;/span&gt; servers {
+		newGroups[gid] = servers
+	}
+	newConfig &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; Config{
+		Num:    length,
+		Shards: [NShards]&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;{},
+		Groups: newGroups,
+	}
+
+	groupToShards &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;getGroupToShards&lt;/span&gt;(newGroups, lastConfig.Shards)
+	zombieShards &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; []&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;{}
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; shard, gid &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;range&lt;/span&gt; lastConfig.Shards {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; gid &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; &lt;span style=&#34;color:#bd93f9&#34;&gt;0&lt;/span&gt; {
+			zombieShards = &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;append&lt;/span&gt;(zombieShards, shard)
+		}
+	}
+
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; _, shard &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;range&lt;/span&gt; zombieShards {
+		target &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;getMinGroup&lt;/span&gt;(groupToShards)
+		groupToShards[target] = &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;append&lt;/span&gt;(groupToShards[target], shard)
+	}
+
+	groupToShards = &lt;span style=&#34;color:#50fa7b&#34;&gt;balanceShardBetweenGroups&lt;/span&gt;(groupToShards)
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; gid, shards &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;range&lt;/span&gt; groupToShards {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; _, shard &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;range&lt;/span&gt; shards {
+			newConfig.Shards[shard] = gid
+		}
+	}
+
+	sc.configs = &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;append&lt;/span&gt;(sc.configs, newConfig)
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h4 id=&#34;leave&#34;&gt;Leave&lt;/h4&gt;
+&lt;p&gt;Group 被删除后，其原先拥有的 Shard 就成了 &lt;code&gt;zombieShard&lt;/code&gt;，应当依次分配被拥有 Shard 数量最少的 Group。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (sc &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;ShardCtrler) &lt;span style=&#34;color:#50fa7b&#34;&gt;executeLeave&lt;/span&gt;(GIDs []&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;) {
+	length &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;len&lt;/span&gt;(sc.configs)
+	lastConfig &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; sc.configs[length&lt;span style=&#34;color:#ff79c6&#34;&gt;-&lt;/span&gt;&lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt;]
+	newGroups &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;deepCopy&lt;/span&gt;(lastConfig.Groups)
+
+	newConfig &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; Config{
+		Num:    length,
+		Shards: [NShards]&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;{},
+		Groups: newGroups,
+	}
+
+	groupToShards &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;getGroupToShards&lt;/span&gt;(newGroups, lastConfig.Shards)
+	zombieShards &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; []&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;{}
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; _, gid &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;range&lt;/span&gt; GIDs {
+		&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;delete&lt;/span&gt;(newConfig.Groups, gid)
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; shards, ok &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; groupToShards[gid]; ok {
+			zombieShards = &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;append&lt;/span&gt;(zombieShards, shards&lt;span style=&#34;color:#ff79c6&#34;&gt;...&lt;/span&gt;)
+			&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;delete&lt;/span&gt;(groupToShards, gid)
+		}
+	}
+
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; _, shard &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;range&lt;/span&gt; zombieShards {
+		target &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;getMinGroup&lt;/span&gt;(groupToShards)
+		groupToShards[target] = &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;append&lt;/span&gt;(groupToShards[target], shard)
+	}
+
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; gid, shards &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;range&lt;/span&gt; groupToShards {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; _, shard &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;range&lt;/span&gt; shards {
+			newConfig.Shards[shard] = gid
+		}
+	}
+
+	sc.configs = &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;append&lt;/span&gt;(sc.configs, newConfig)
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h4 id=&#34;move&#34;&gt;Move&lt;/h4&gt;
+&lt;p&gt;将指定的 Shard 交由新的 Group 负责，只需要改动 &lt;code&gt;Shards&lt;/code&gt; 数组。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (sc &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;ShardCtrler) &lt;span style=&#34;color:#50fa7b&#34;&gt;executeMove&lt;/span&gt;(shard &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;, gid &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;) {
+	length &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;len&lt;/span&gt;(sc.configs)
+	lastConfig &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; sc.configs[length&lt;span style=&#34;color:#ff79c6&#34;&gt;-&lt;/span&gt;&lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt;]
+	newGroups &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;deepCopy&lt;/span&gt;(lastConfig.Groups)
+
+	newConfig &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; Config{
+		Num:    length,
+		Shards: lastConfig.Shards,
+		Groups: newGroups,
+	}
+
+	newConfig.Shards[shard] = gid
+	sc.configs = &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;append&lt;/span&gt;(sc.configs, newConfig)
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h4 id=&#34;query&#34;&gt;Query&lt;/h4&gt;
+&lt;p&gt;&lt;code&gt;Query&lt;/code&gt; 查询指定版本的 Config。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (sc &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;ShardCtrler) &lt;span style=&#34;color:#50fa7b&#34;&gt;executeQuery&lt;/span&gt;(num &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;) Config {
+	length &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;len&lt;/span&gt;(sc.configs)
+	config &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; Config{}
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; num &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;-&lt;/span&gt;&lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;||&lt;/span&gt; num &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;gt;=&lt;/span&gt; length {
+		config = sc.configs[length&lt;span style=&#34;color:#ff79c6&#34;&gt;-&lt;/span&gt;&lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt;]
+	} &lt;span style=&#34;color:#ff79c6&#34;&gt;else&lt;/span&gt; {
+		config = sc.configs[num]
+	}
+
+	newGroups &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;deepCopy&lt;/span&gt;(config.Groups)
+	newConfig &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; Config{
+		Num:    config.Num,
+		Shards: config.Shards,
+		Groups: newGroups,
+	}
+
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; newConfig
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h3 id=&#34;测试结果&#34;&gt;测试结果&lt;/h3&gt;
+&lt;pre tabindex=&#34;0&#34;&gt;&lt;code class=&#34;language-log&#34; data-lang=&#34;log&#34;&gt;Test: Basic leave/join ...
+  ... Passed
+Test: Historical queries ...
+  ... Passed
+Test: Move ...
+  ... Passed
+Test: Concurrent leave/join ...
+  ... Passed
+Test: Minimal transfers after joins ...
+  ... Passed
+Test: Minimal transfers after leaves ...
+  ... Passed
+Test: Multi-group join/leave ...
+  ... Passed
+Test: Concurrent multi leave/join ...
+  ... Passed
+Test: Minimal transfers after multijoins ...
+  ... Passed
+Test: Minimal transfers after multileaves ...
+  ... Passed
+Test: Check Same config on servers ...
+  ... Passed
+PASS
+ok  	6.824/shardctrler	5.641s
+&lt;/code&gt;&lt;/pre&gt;&lt;h3 id=&#34;server-1&#34;&gt;server&lt;/h3&gt;
+&lt;h4 id=&#34;整体结构&#34;&gt;整体结构&lt;/h4&gt;
+&lt;p&gt;&lt;code&gt;ShardKV&lt;/code&gt; 的状态机 db 由多个 Shard 组成，每个 Shard 包含了自己的状态、kv和客户端请求去重表，这使得不同的 Shard 之间可以在独立迁移的同时不影响未受影响的 Shard 对外正常提供服务，也可以通过 Shard 的状态来进行许多判断，每个状态的含义在注释中。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; ShardKV &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	mu           sync.RWMutex
+	me           &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	rf           &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;raft.Raft
+	applyCh      &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; raft.ApplyMsg
+	make_end     &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;) &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;labrpc.ClientEnd
+	gid          &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	ctrlers      []&lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;labrpc.ClientEnd
+	maxraftstate &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt; &lt;span style=&#34;color:#6272a4&#34;&gt;// snapshot if log grows this big
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;
+	&lt;span style=&#34;color:#6272a4&#34;&gt;// Your definitions here.
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	prevConfig       shardctrler.Config
+	currConfig       shardctrler.Config
+	persister        &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;raft.Persister
+	scClerk          &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;shardctrler.Clerk
+	notifyChans      &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;]&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; CommandResponse
+	db               &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;]&lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Shard
+	lastAppliedIndex &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+}
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; ShardStatus &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;const&lt;/span&gt; (
+	&lt;span style=&#34;color:#6272a4&#34;&gt;// The group serves and owns the shard.
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	Serving ShardStatus = &lt;span style=&#34;color:#ff79c6&#34;&gt;iota&lt;/span&gt;
+	&lt;span style=&#34;color:#6272a4&#34;&gt;// The group serves the shard, but does not own the shard yet.
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	Pulling
+	&lt;span style=&#34;color:#6272a4&#34;&gt;// The group does not serve and own the partition.
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	Invalid
+	&lt;span style=&#34;color:#6272a4&#34;&gt;// The group owns but does not serve the shard.
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	Erasing
+	&lt;span style=&#34;color:#6272a4&#34;&gt;// The group own the shard and serve it, but it&amp;#39;s waiting for ex-owner to delete it
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	Waiting
+)
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; Shard &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	Status       ShardStatus
+	KV           &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;]&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;
+	LastSessions &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;]&lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Session
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;leader需要执行多个定时任务，需要在后台启动协程来循环判断状态、执行任务、睡眠。我抽象出了一个 &lt;code&gt;daemon&lt;/code&gt; 函数来完成这些。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;StartServer&lt;/span&gt;(servers []&lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;labrpc.ClientEnd, me &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;, persister &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;raft.Persister, maxraftstate &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;, gid &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;, ctrlers []&lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;labrpc.ClientEnd, make_end &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;) &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;labrpc.ClientEnd) &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;ShardKV {
+	···
+	&lt;span style=&#34;color:#6272a4&#34;&gt;// Your initialization code here.
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;
+	&lt;span style=&#34;color:#6272a4&#34;&gt;// Use something like this to talk to the shardctrler:
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	&lt;span style=&#34;color:#6272a4&#34;&gt;// kv.mck = shardctrler.MakeClerk(kv.ctrlers)
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	kv.applyCh = &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;make&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; raft.ApplyMsg)
+	kv.rf = raft.&lt;span style=&#34;color:#50fa7b&#34;&gt;Make&lt;/span&gt;(servers, me, persister, kv.applyCh)
+	kv.scClerk = shardctrler.&lt;span style=&#34;color:#50fa7b&#34;&gt;MakeClerk&lt;/span&gt;(kv.ctrlers)
+	kv.mu = sync.RWMutex{}
+	kv.notifyChans = &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;make&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;]&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; CommandResponse)
+	kv.db = &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;make&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;]&lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Shard)
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; i &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#bd93f9&#34;&gt;0&lt;/span&gt;; i &amp;lt; shardctrler.NShards; i&lt;span style=&#34;color:#ff79c6&#34;&gt;++&lt;/span&gt; {
+		kv.db[i] = &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;Shard{
+			Status:       Invalid,
+			KV:           &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;make&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;]&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;),
+			LastSessions: &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;make&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;]&lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Session),
+		}
+	}
+
+	kv.lastAppliedIndex = &lt;span style=&#34;color:#ff79c6&#34;&gt;-&lt;/span&gt;&lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt;
+	kv.prevConfig = shardctrler.Config{}
+	kv.currConfig = shardctrler.Config{}
+	kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;applySnapshot&lt;/span&gt;(persister.&lt;span style=&#34;color:#50fa7b&#34;&gt;ReadSnapshot&lt;/span&gt;())
+
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;go&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;applier&lt;/span&gt;()
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;go&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;daemon&lt;/span&gt;(kv.fetchConfig)
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;go&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;daemon&lt;/span&gt;(kv.pullData)
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;go&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;daemon&lt;/span&gt;(kv.eraseData)
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;go&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;daemon&lt;/span&gt;(kv.proposeEmpty)
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; kv
+}
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (kv &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;ShardKV) &lt;span style=&#34;color:#50fa7b&#34;&gt;daemon&lt;/span&gt;(action &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt;()) {
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; !kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;killed&lt;/span&gt;() {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; _, isLeader &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;GetState&lt;/span&gt;(); isLeader {
+			&lt;span style=&#34;color:#50fa7b&#34;&gt;action&lt;/span&gt;()
+		}
+
+		time.&lt;span style=&#34;color:#50fa7b&#34;&gt;Sleep&lt;/span&gt;(&lt;span style=&#34;color:#bd93f9&#34;&gt;50&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt; time.Millisecond)
+	}
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;applier 的结构和lab3类似，日志被 commit 之后根据 CommandType 的不同执行不同的applyxxx，其中 &lt;code&gt;EraseData&lt;/code&gt; 和 &lt;code&gt;ClientRequest&lt;/code&gt; 需要返回 response。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; CommandType &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;const&lt;/span&gt; (
+	ClientRequest CommandType = &lt;span style=&#34;color:#ff79c6&#34;&gt;iota&lt;/span&gt;
+	ConfChange
+	InsertData
+	EraseData
+	StopWaiting
+	Empty
+)
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; RaftLogCommand &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	CommandType
+	Data &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;interface&lt;/span&gt;{}
+}
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;newRaftLogCommand&lt;/span&gt;(commandType CommandType, data &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;interface&lt;/span&gt;{}) RaftLogCommand {
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; RaftLogCommand{
+		CommandType: commandType,
+		Data: data,
+	}
+}
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (kv &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;ShardKV) &lt;span style=&#34;color:#50fa7b&#34;&gt;applier&lt;/span&gt;() {
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; !kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;killed&lt;/span&gt;() {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;select&lt;/span&gt; {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; applyMsg &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;kv.applyCh:
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; applyMsg.CommandValid {
+				command &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; applyMsg.Command.(RaftLogCommand)
+				kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;Lock&lt;/span&gt;()
+
+				&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; applyMsg.CommandIndex &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;=&lt;/span&gt; kv.lastAppliedIndex {
+					&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Group %d][Server %d] discard out-of-date apply Msg [index %d]&amp;#34;&lt;/span&gt;, kv.gid, kv.me, applyMsg.CommandIndex)
+					kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;Unlock&lt;/span&gt;()
+					&lt;span style=&#34;color:#ff79c6&#34;&gt;continue&lt;/span&gt;
+				}
+
+				kv.lastAppliedIndex = applyMsg.CommandIndex
+				response &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;CommandResponse{}
+				&lt;span style=&#34;color:#ff79c6&#34;&gt;switch&lt;/span&gt; command.CommandType {
+				&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; Empty:
+					&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Group %d][Server %d] get empty in apply Msg [index %d]&amp;#34;&lt;/span&gt;, kv.gid, kv.me, applyMsg.CommandIndex)
+				&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; ConfChange:
+					lastestConf &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; command.Data.(shardctrler.Config)
+					kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;applyConfChange&lt;/span&gt;(lastestConf, applyMsg.CommandIndex)
+
+				&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; InsertData:
+					resp &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; command.Data.(PullDataResponse)
+					kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;applyInsertData&lt;/span&gt;(resp, applyMsg.CommandIndex)
+
+				&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; StopWaiting:
+					req &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; command.Data.(EraseDataRequest)
+					kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;applyStopWaiting&lt;/span&gt;(req, applyMsg.CommandIndex)
+
+				&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; EraseData:
+					req &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; command.Data.(EraseDataRequest)
+					response = kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;applyEraseData&lt;/span&gt;(req, applyMsg.CommandIndex)
+					&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; currentTerm, isLeader &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;GetState&lt;/span&gt;(); currentTerm &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; applyMsg.CommandTerm &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; isLeader {
+						ch &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;getNotifyChan&lt;/span&gt;(applyMsg.CommandIndex)
+						ch &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;response
+					}
+
+				&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; ClientRequest:
+					request &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; command.Data.(CommandRequest)
+					response = kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;applyClientRequest&lt;/span&gt;(&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;request, applyMsg.CommandIndex)
+					&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; currentTerm, isLeader &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;GetState&lt;/span&gt;(); currentTerm &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; applyMsg.CommandTerm &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; isLeader {
+						ch &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;getNotifyChan&lt;/span&gt;(applyMsg.CommandIndex)
+						ch &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;response
+					}
+				}
+
+				&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;needToSnapshot&lt;/span&gt;(applyMsg.RaftStateSize) {
+					&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Group %d][Server %d] take a snapshot till [index %d]&amp;#34;&lt;/span&gt;, kv.gid, kv.me, applyMsg.CommandIndex)
+					kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;takeSnapshot&lt;/span&gt;(applyMsg.CommandIndex)
+				}
+
+				kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;Unlock&lt;/span&gt;()
+			} &lt;span style=&#34;color:#ff79c6&#34;&gt;else&lt;/span&gt; {
+				kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;Lock&lt;/span&gt;()
+				&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Group %d][Server %d] received a snapshot from raft layer [index %d]&amp;#34;&lt;/span&gt;, kv.gid, kv.me, applyMsg.SnapshotIndex)
+				&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; kv.rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;CondInstallSnapshot&lt;/span&gt;(applyMsg.SnapshotTerm, applyMsg.SnapshotIndex, applyMsg.Snapshot) {
+					kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;applySnapshot&lt;/span&gt;(applyMsg.Snapshot)
+					kv.lastAppliedIndex = applyMsg.SnapshotIndex
+				}
+
+				kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;Unlock&lt;/span&gt;()
+			}
+		}
+	}
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h4 id=&#34;客户端请求&#34;&gt;客户端请求&lt;/h4&gt;
+&lt;p&gt;这里和lab3基本一样，不同的是handle RPC 以及日志apply时都需要额外判断在当前版本的 Config 下本 Group 是否负责该 key 所属的 Shard。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (kv &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;ShardKV) &lt;span style=&#34;color:#50fa7b&#34;&gt;isShardMatch&lt;/span&gt;(shardId &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;) &lt;span style=&#34;color:#8be9fd&#34;&gt;bool&lt;/span&gt; {
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; kv.currConfig.Shards[shardId] &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; kv.gid &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; (kv.db[shardId].Status &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; Serving &lt;span style=&#34;color:#ff79c6&#34;&gt;||&lt;/span&gt; kv.db[shardId].Status &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; Waiting)
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h4 id=&#34;配置更新&#34;&gt;配置更新&lt;/h4&gt;
+&lt;p&gt;每个 Group 中的 leader 需要在后台启动一个协程向 ShardCtrler 定时使用 &lt;code&gt;Query&lt;/code&gt; 拉取最新配置，一旦拉取到就需要提交一条 raft 日志，以在每台机器上更新配置。&lt;/p&gt;
+&lt;p&gt;此外，每次只能拉取高一个版本的配置，而且为了防止集群的分片状态被覆盖，从而使得某些任务永远不会被执行，只有在每一 Shard 的状态都为 &lt;code&gt;Serving&lt;/code&gt; 或 &lt;code&gt;Invalid&lt;/code&gt; 时才能拉取、更新配置。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (kv &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;ShardKV) &lt;span style=&#34;color:#50fa7b&#34;&gt;fetchConfig&lt;/span&gt;() {
+	canFetchConf &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;true&lt;/span&gt;
+	kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;RLock&lt;/span&gt;()
+	currConfNum &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.currConfig.Num
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; shardId, shard &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;range&lt;/span&gt; kv.db {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; shard.Status &lt;span style=&#34;color:#ff79c6&#34;&gt;!=&lt;/span&gt; Serving &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; shard.Status &lt;span style=&#34;color:#ff79c6&#34;&gt;!=&lt;/span&gt; Invalid {
+			canFetchConf = &lt;span style=&#34;color:#ff79c6&#34;&gt;false&lt;/span&gt;
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;break&lt;/span&gt;
+		}
+	}
+
+	kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;RUnlock&lt;/span&gt;()
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; canFetchConf {
+		latestConfig &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.scClerk.&lt;span style=&#34;color:#50fa7b&#34;&gt;Query&lt;/span&gt;(currConfNum &lt;span style=&#34;color:#ff79c6&#34;&gt;+&lt;/span&gt; &lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt;)
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; latestConfig.Num &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; currConfNum&lt;span style=&#34;color:#ff79c6&#34;&gt;+&lt;/span&gt;&lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt; {
+			kv.rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;Start&lt;/span&gt;(&lt;span style=&#34;color:#50fa7b&#34;&gt;newRaftLogCommand&lt;/span&gt;(ConfChange, latestConfig))
+		}
+	}
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;在每台机器上，新配置对应的 raft 日志被 commit 之后，都需要更新本地的 &lt;code&gt;prevConfig&lt;/code&gt; 和 &lt;code&gt;currConfig&lt;/code&gt;，以及更新 db 中对应的 Shard 状态，以便让数据拉取、数据清理协程能检测到去进行数据迁移。&lt;/p&gt;
+&lt;p&gt;在新版本的 Config 中新增的 Shard 状态改为 Pulling，等待拉取数据协程去其他 Group 上拉数据。失去的 Shard 状态改为 Erasing，等待其他 Group 来拉取数据。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (kv &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;ShardKV) &lt;span style=&#34;color:#50fa7b&#34;&gt;applyConfChange&lt;/span&gt;(conf shardctrler.Config, index &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;) {
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; conf.Num &lt;span style=&#34;color:#ff79c6&#34;&gt;!=&lt;/span&gt; kv.currConfig.Num&lt;span style=&#34;color:#ff79c6&#34;&gt;+&lt;/span&gt;&lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt; {
+		&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Group %d][Server %d] discard out-of-date conf change in apply Msg [index %d]&amp;#34;&lt;/span&gt;, kv.gid, kv.me, index)
+	} &lt;span style=&#34;color:#ff79c6&#34;&gt;else&lt;/span&gt; {
+		kv.prevConfig = kv.currConfig
+		kv.currConfig = conf
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; shardID, gid &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;range&lt;/span&gt; kv.currConfig.Shards {
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; gid &lt;span style=&#34;color:#ff79c6&#34;&gt;!=&lt;/span&gt; kv.gid {
+				kv.db[shardID].Status = Invalid
+			} &lt;span style=&#34;color:#ff79c6&#34;&gt;else&lt;/span&gt; {
+				kv.db[shardID].Status = Serving
+			}
+		}
+
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; kv.prevConfig.Num &lt;span style=&#34;color:#ff79c6&#34;&gt;!=&lt;/span&gt; &lt;span style=&#34;color:#bd93f9&#34;&gt;0&lt;/span&gt; {
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; i, shard &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;range&lt;/span&gt; kv.db {
+				&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; kv.prevConfig.Shards[i] &lt;span style=&#34;color:#ff79c6&#34;&gt;!=&lt;/span&gt; kv.gid &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; kv.currConfig.Shards[i] &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; kv.gid {
+					shard.Status = Pulling
+				}
+
+				&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; kv.prevConfig.Shards[i] &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; kv.gid &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; kv.currConfig.Shards[i] &lt;span style=&#34;color:#ff79c6&#34;&gt;!=&lt;/span&gt; kv.gid {
+					shard.Status = Erasing
+				}
+			}
+		}
+
+		&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Group %d][Server %d] apply latest config [ver %d shards %+v] in apply Msg [index %d]&amp;#34;&lt;/span&gt;, kv.gid, kv.me, conf.Num, conf.Shards, index)
+	}
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h4 id=&#34;数据拉取&#34;&gt;数据拉取&lt;/h4&gt;
+&lt;p&gt;新的 Config 在 applier 协程中被应用并不表示所属分片可以立刻对外提供服务，还需要等待在上一个版本的 Config 中不属于自身的 Shard 从它之前所属的 Group 中迁移到本 Group。&lt;/p&gt;
+&lt;p&gt;这里显然不能在配置更新时同步阻塞的去拉取 Shard，这会阻塞 applier 协程，严重影响对外服务的可用性。那么是否可以异步的去拉取数据并提交日志？其实不行，leader 可能会在 apply 新配置之后到新数据被异步拉取到并提交日志之前宕机，而 follower 虽然会 apply 配置但是不会去拉数据，这样这些数据将永远无法被更新。&lt;/p&gt;
+&lt;p&gt;因此，我们不能在 apply 配置的时候启动异步任务，而是应该只更新 shard 的状态，由单独的后台协程去检测每个 Shard 的状态，从而判断是否需要并执行分片迁移，分片清理等任务。为了让单独的协程能知道该向哪个 Group 去拉取数据或让它去删除数据，&lt;code&gt;ShardKV&lt;/code&gt; 需要维护 currConfig 和 prevConfig，这样其他协程能够通过它们来得知所有 Shard 的 ex-owner。&lt;/p&gt;
+&lt;p&gt;需要定义新的RPC来完成数据拉取。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; PullDataRequest &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	ConfNum  &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	ShardIds []&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+}
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; PullDataResponse &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	Err     Err
+	ConfNum &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	Shards  &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;]&lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Shard
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;并行向状态为 &lt;code&gt;Pulling&lt;/code&gt; 的不同 Shard 的 ex-owner 发送RPC来拉取数据，使用 waitGroup 来保证尝试拉取了一遍当前版本的配置所需要的所有 Shard 之后才能进行下一轮循环。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (kv &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;ShardKV) &lt;span style=&#34;color:#50fa7b&#34;&gt;pullData&lt;/span&gt;() {
+	kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;RLock&lt;/span&gt;()
+	groupToShards &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;getGroupToShards&lt;/span&gt;(Pulling)
+	currConfNum &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.currConfig.Num
+	wg &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; sync.WaitGroup{}
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; gid, shards &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;range&lt;/span&gt; groupToShards {
+		wg.&lt;span style=&#34;color:#50fa7b&#34;&gt;Add&lt;/span&gt;(&lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt;)
+		servers &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.prevConfig.Groups[gid]
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;go&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt;(servers []&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;, shards []&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;, confNum &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;) {
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;defer&lt;/span&gt; wg.&lt;span style=&#34;color:#50fa7b&#34;&gt;Done&lt;/span&gt;()
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; _, server &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;range&lt;/span&gt; servers {
+				shardOwner &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;make_end&lt;/span&gt;(server)
+				args &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; PullDataRequest{
+					ConfNum:  confNum,
+					ShardIds: shards,
+				}
+
+				reply &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; PullDataResponse{}
+				&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; shardOwner.&lt;span style=&#34;color:#50fa7b&#34;&gt;Call&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;ShardKV.PullData&amp;#34;&lt;/span&gt;, &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;args, &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;reply) &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; reply.Err &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; OK {
+					kv.rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;Start&lt;/span&gt;(&lt;span style=&#34;color:#50fa7b&#34;&gt;newRaftLogCommand&lt;/span&gt;(InsertData, resp))
+					&lt;span style=&#34;color:#ff79c6&#34;&gt;break&lt;/span&gt;
+				}
+			}
+		}(servers, shards, currConfNum)
+	}
+
+	kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;RUnlock&lt;/span&gt;()
+	wg.&lt;span style=&#34;color:#50fa7b&#34;&gt;Wait&lt;/span&gt;()
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;只有在 PullDataRequest 中的配置版本与自身的配置版本相同时，才回应其需要的 Shard 信息。需要注意正确的对所有 Shard 深拷贝。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (kv &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;ShardKV) &lt;span style=&#34;color:#50fa7b&#34;&gt;PullData&lt;/span&gt;(args &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;PullDataRequest, reply &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;PullDataResponse) {
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;defer&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Group %d][Server %d] reply %s for PULL DATA request %s&amp;#34;&lt;/span&gt;, kv.gid, kv.me, reply, args)
+	&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Group %d][Server %d] received a PULL DATA request %s&amp;#34;&lt;/span&gt;, kv.gid, kv.me, args)
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; _, isLeader &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;GetState&lt;/span&gt;(); !isLeader {
+		reply.Err = ErrWrongLeader
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt;
+	}
+
+	kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;RLock&lt;/span&gt;()
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;defer&lt;/span&gt; kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;RUnlock&lt;/span&gt;()
+
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; kv.currConfig.Num &amp;lt; args.ConfNum {
+		reply.Err = ErrNotReady
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt;
+	}
+
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; kv.currConfig.Num &amp;gt; args.ConfNum {
+		&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;panic&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;duplicated pull data request&amp;#34;&lt;/span&gt;)
+	}
+
+	replyShards &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;make&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;]&lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Shard)
+
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; _, shardId &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;range&lt;/span&gt; args.ShardIds {
+		shard &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.db[shardId]
+		replyShards[shardId] = &lt;span style=&#34;color:#50fa7b&#34;&gt;deepCopyShard&lt;/span&gt;(shard)
+	}
+
+	reply.ConfNum = kv.currConfig.Num
+	reply.Shards = replyShards
+	reply.Err = OK
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;为了保证集群数据变更的幂等性，apply 时也要保证 Config 的版本与当前版本相同以及其 Shard 的本地状态为 &lt;code&gt;Pulling&lt;/code&gt;，将其状态改为 &lt;code&gt;Waiting&lt;/code&gt; 让数据清理协程去检测。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (kv &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;ShardKV) &lt;span style=&#34;color:#50fa7b&#34;&gt;applyInsertData&lt;/span&gt;(resp PullDataResponse, index &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;) {
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; resp.ConfNum &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; kv.currConfig.Num {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; shardID, shard &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;range&lt;/span&gt; resp.Shards {
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; kv.db[shardID].Status &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; Pulling {
+				&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Group %d][Server %d] start to serve shard %d&amp;#34;&lt;/span&gt;, kv.gid, kv.me, shardID)
+				kv.db[shardID] = &lt;span style=&#34;color:#50fa7b&#34;&gt;deepCopyShard&lt;/span&gt;(shard)
+				kv.db[shardID].Status = Waiting
+			} &lt;span style=&#34;color:#ff79c6&#34;&gt;else&lt;/span&gt; {
+				&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Group %d][Server %d] encounter duplicated insert data [shardID %d status %s] in apply Msg [index %d]&amp;#34;&lt;/span&gt;, kv.gid, kv.me, shardID, ShardStatusName[shard.Status], index)
+				&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt;
+			}
+		}
+		&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Group %d][Server %d] apply insert data in apply Msg [index %d]&amp;#34;&lt;/span&gt;, kv.gid, kv.me, index)
+	} &lt;span style=&#34;color:#ff79c6&#34;&gt;else&lt;/span&gt; {
+		&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Group %d][Server %d] discard out-of-date insert data in apply Msg [index %d]&amp;#34;&lt;/span&gt;, kv.gid, kv.me, index)
+	}
+
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h4 id=&#34;数据清理&#34;&gt;数据清理&lt;/h4&gt;
+&lt;h5 id=&#34;current-owner&#34;&gt;current owner&lt;/h5&gt;
+&lt;p&gt;在完成数据拉取之后，需要清理掉每个新拉到的 Shard 对应的 ex-owner 机器上的旧数据。后台协程检查所有状态为 &lt;code&gt;Waiting&lt;/code&gt; 的 Shard，并行向它们的 ex-owners 分别发送 RPC，告知它们：我已拉取到我要的数据，现在你可以把它们删了。这里 waitGroup 的用法同上。&lt;/p&gt;
+&lt;p&gt;RPC返回且得知 ex-owners 上的数据清理已经完成后需要提交一条 &lt;code&gt;StopWaiting&lt;/code&gt; 类型的 raft 日志，将这个信息同步到 Group 内所有机器上。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; EraseDataRequest &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	ConfNum  &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+	ShardIDs []&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
+}
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; EraseDataResponse &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	Err Err
+}
+
+&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (kv &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;ShardKV) &lt;span style=&#34;color:#50fa7b&#34;&gt;eraseData&lt;/span&gt;() {
+	kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;RLock&lt;/span&gt;()
+	groupToShards &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;getGroupToShards&lt;/span&gt;(Waiting)
+	currConfNum &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.currConfig.Num
+	wg &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; sync.WaitGroup{}
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; gid, shards &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;range&lt;/span&gt; groupToShards {
+		wg.&lt;span style=&#34;color:#50fa7b&#34;&gt;Add&lt;/span&gt;(&lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt;)
+		servers &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.prevConfig.Groups[gid]
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;go&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt;(servers []&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;, shards []&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;, confNum &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;) {
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;defer&lt;/span&gt; wg.&lt;span style=&#34;color:#50fa7b&#34;&gt;Done&lt;/span&gt;()
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; _, server &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;range&lt;/span&gt; servers {
+				shardOwner &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;make_end&lt;/span&gt;(server)
+				args &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; EraseDataRequest{
+					ConfNum:  confNum,
+					ShardIDs: shards,
+				}
+
+				reply &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; EraseDataResponse{}
+				&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; shardOwner.&lt;span style=&#34;color:#50fa7b&#34;&gt;Call&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;ShardKV.EraseData&amp;#34;&lt;/span&gt;, &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;args, &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;reply) &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; reply.Err &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; OK {
+					kv.rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;Start&lt;/span&gt;(&lt;span style=&#34;color:#50fa7b&#34;&gt;newRaftLogCommand&lt;/span&gt;(StopWaiting, req))
+					&lt;span style=&#34;color:#ff79c6&#34;&gt;break&lt;/span&gt;
+				}
+			}
+		}(servers, shards, currConfNum)
+	}
+
+	kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;RUnlock&lt;/span&gt;()
+	wg.&lt;span style=&#34;color:#50fa7b&#34;&gt;Wait&lt;/span&gt;()
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;&lt;code&gt;StopWaiting&lt;/code&gt; 日志以及 Shard 的 &lt;code&gt;Waiting&lt;/code&gt; 状态存在的意义是能够标记我是否已经成功在 ex-owner 上删除过期的 Shard。apply 时将对应的状态为 &lt;code&gt;Waiting&lt;/code&gt; 的 Shard 更新状态为 &lt;code&gt;Serving&lt;/code&gt;。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (kv &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;ShardKV) &lt;span style=&#34;color:#50fa7b&#34;&gt;applyStopWaiting&lt;/span&gt;(req EraseDataRequest, index &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;) {
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; req.ConfNum &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; kv.currConfig.Num {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; _, shardID &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;range&lt;/span&gt; req.ShardIDs {
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; kv.db[shardID].Status &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; Waiting {
+				kv.db[shardID].Status = Serving
+				&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Group %d][Server %d] erase shard %d on its ex-owner&amp;#34;&lt;/span&gt;, kv.gid, kv.me, shardID)
+			} &lt;span style=&#34;color:#ff79c6&#34;&gt;else&lt;/span&gt; {
+				&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Group %d][Server %d] encounter duplicated stop waiting in apply Msg [index %d]&amp;#34;&lt;/span&gt;, kv.gid, kv.me, index)
+				&lt;span style=&#34;color:#ff79c6&#34;&gt;break&lt;/span&gt;
+			}
+		}
+		&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Group %d][Server %d] apply stop waiting in apply Msg [index %d]&amp;#34;&lt;/span&gt;, kv.gid, kv.me, index)
+	} &lt;span style=&#34;color:#ff79c6&#34;&gt;else&lt;/span&gt; {
+		&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Group %d][Server %d] discard out-of-date stop waiting in apply Msg [index %d]&amp;#34;&lt;/span&gt;, kv.gid, kv.me, index)
+	}
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h5 id=&#34;ex-owner&#34;&gt;ex-owner&lt;/h5&gt;
+&lt;p&gt;ex-owner 在处理 &lt;code&gt;EraseData&lt;/code&gt; 的RPC时，需要返回数据清理是否完成，这里的处理类似处理客户端请求。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (kv &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;ShardKV) &lt;span style=&#34;color:#50fa7b&#34;&gt;EraseData&lt;/span&gt;(req &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;EraseDataRequest, resp &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;EraseDataResponse) {
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;defer&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Group %d][Server %d] resp %s for ERASE DATA request %s&amp;#34;&lt;/span&gt;, kv.gid, kv.me, resp, req)
+	&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Group %d][Server %d] received a ERASE DATA request %s&amp;#34;&lt;/span&gt;, kv.gid, kv.me, req)
+	index, _, isLeader &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;Start&lt;/span&gt;(&lt;span style=&#34;color:#50fa7b&#34;&gt;newRaftLogCommand&lt;/span&gt;(EraseData, &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;req))
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; !isLeader {
+		resp.Err = ErrWrongLeader
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt;
+	}
+
+	kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;Lock&lt;/span&gt;()
+	ch &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;getNotifyChan&lt;/span&gt;(index)
+	kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;Unlock&lt;/span&gt;()
+
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;select&lt;/span&gt; {
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; response &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;ch:
+		resp.Err = response.Err
+
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt;time.&lt;span style=&#34;color:#50fa7b&#34;&gt;NewTimer&lt;/span&gt;(&lt;span style=&#34;color:#bd93f9&#34;&gt;500&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt; time.Millisecond).C:
+		resp.Err = ErrTimeout
+	}
+
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;go&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt;() {
+		kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;Lock&lt;/span&gt;()
+		kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;removeNotifyChan&lt;/span&gt;(index)
+		kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;Unlock&lt;/span&gt;()
+	}()
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;apply 时将对应的状态为 &lt;code&gt;Erasing&lt;/code&gt; 的 Shard 更新为 &lt;code&gt;Invalid&lt;/code&gt;，清空 kv 和客户端请求去重表。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (kv &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;ShardKV) &lt;span style=&#34;color:#50fa7b&#34;&gt;applyEraseData&lt;/span&gt;(req EraseDataRequest, index &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;) &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;CommandResponse {
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; req.ConfNum &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; kv.currConfig.Num {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; _, shardID &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;range&lt;/span&gt; req.ShardIDs {
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; kv.db[shardID].Status &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; Erasing {
+				kv.db[shardID] = &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;Shard{
+					Status: Invalid,
+				}
+				&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Group %d][Server %d] erase data [shardID %d] for config [ver %d] in apply Msg [index %d]&amp;#34;&lt;/span&gt;, kv.gid, kv.me, shardID, kv.currConfig.Num, index)
+			} &lt;span style=&#34;color:#ff79c6&#34;&gt;else&lt;/span&gt; {
+				&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Group %d][Server %d] encounter duplicated erase data in apply Msg [index %d]&amp;#34;&lt;/span&gt;, kv.gid, kv.me, index)
+				&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;CommandResponse{OK, &lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;&amp;#34;&lt;/span&gt;}
+			}
+		}
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;CommandResponse{OK, &lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;&amp;#34;&lt;/span&gt;}
+	} &lt;span style=&#34;color:#ff79c6&#34;&gt;else&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; req.ConfNum &amp;gt; kv.currConfig.Num {
+		&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Group %d][Server %d] current config [ver %d], not ready for erase data request [ver %d] in apply Msg [index %d]&amp;#34;&lt;/span&gt;, kv.gid, kv.me, kv.currConfig.Num, req.ConfNum, index)
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;CommandResponse{ErrNotReady, &lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;&amp;#34;&lt;/span&gt;}
+	} &lt;span style=&#34;color:#ff79c6&#34;&gt;else&lt;/span&gt; {
+		&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[Group %d][Server %d] discard out-of-date erase data in apply Msg [index %d]&amp;#34;&lt;/span&gt;, kv.gid, kv.me, index)
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;CommandResponse{OK, &lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;&amp;#34;&lt;/span&gt;}
+	}
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h4 id=&#34;提交空日志&#34;&gt;提交空日志&lt;/h4&gt;
+&lt;p&gt;在某个涉及重启的测试中，有时候会出现集群对外出现活锁，无法再服务请求直到超时。我重新打了很多日志，发现这时各个 Group 间的 Config 版本不一致，且版本较低的 Group 的一些 Shard 状态不为 &lt;code&gt;Serving&lt;/code&gt; 和 &lt;code&gt;Invalid&lt;/code&gt;，这卡着配置更新协程无法拉取最新的 Config。按理说 Config 的版本只能以1为公差递增，其余的 Group 版本高说明也经历过较低的这个版本，应该有向这个 Group 发送过拉取数据和清理数据的RPC来更新 Shard 状态，那么为什么状态并没有被更新呢？&lt;/p&gt;
+&lt;p&gt;仔细读了很久日志，我发现版本较低的 Group 在推进 Config 到这个版本之后已经正确处理过拉取数据或是清理数据的RPC也更新了 Shard 状态，但在重启后这最后处理的关键RPC对应的日志并没有重新被commit。原来，此时 leader 的 currentTerm 高于这个RPC对应的日志的 term，且这个时间节点客户端碰巧没有向该 Group 组执行读写请求，导致 leader 无法拥有当前任期的 term 的日志，无法将状态机更新到最新。&lt;/p&gt;
+&lt;p&gt;lab4的最后一部分是我在写完 TinyKV 之后做的，我想到 TinyKV （其实 etcd 也是这么做的）中要求的 leader 在当选时要先提交一条空日志，这样可以保证集群的可用性，于是我也移植了这个特性到 6.824 中。&lt;/p&gt;
+&lt;p&gt;想起了以前几个月前看过的 &lt;a class=&#34;link&#34; href=&#34;https://github.com/OneSizeFitsQuorum/MIT6.824-2021/blob/master/docs/lab4.md#%E7%A9%BA%E6%97%A5%E5%BF%97%E6%A3%80%E6%B5%8B&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;谭新宇&lt;/a&gt; 的文章，我知道了不能把这个特性加到 raft 层。于是我也让 leader 在 kv 层周期性的去检测下层是否包含当前 term 的日志，如果没有便 append 一条空日志，这样即可保证新选出的 leader 状态机能够迅速达到最新。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (kv &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;ShardKV) &lt;span style=&#34;color:#50fa7b&#34;&gt;proposeEmpty&lt;/span&gt;() {
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; !kv.rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;HasLogAtCurrentTerm&lt;/span&gt;() {
+		kv.rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;Start&lt;/span&gt;(&lt;span style=&#34;color:#50fa7b&#34;&gt;newRaftLogCommand&lt;/span&gt;(Empty, &lt;span style=&#34;color:#ff79c6&#34;&gt;nil&lt;/span&gt;))
+	}
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h3 id=&#34;测试结果-1&#34;&gt;测试结果&lt;/h3&gt;
+&lt;pre tabindex=&#34;0&#34;&gt;&lt;code class=&#34;language-log&#34; data-lang=&#34;log&#34;&gt;Test: static shards ...
+  ... Passed
+Test: join then leave ...
+  ... Passed
+Test: snapshots, join, and leave ...
+  ... Passed
+Test: servers miss configuration changes...
+  ... Passed
+Test: concurrent puts and configuration changes...
+  ... Passed
+Test: more concurrent puts and configuration changes...
+  ... Passed
+Test: concurrent configuration change and restart...
+  ... Passed
+Test: unreliable 1...
+  ... Passed
+Test: unreliable 2...
+  ... Passed
+Test: unreliable 3...
+  ... Passed
+Test: shard deletion (challenge 1) ...
+  ... Passed
+Test: unaffected shard access (challenge 2) ...
+  ... Passed
+Test: partial migration shard access (challenge 2) ...
+  ... Passed
+PASS
+ok  	6.824/shardkv	108.040s
+&lt;/code&gt;&lt;/pre&gt;</description>
+        </item>
+        <item>
         <title>mit-6.824 lab3: RaftKV</title>
         <link>https://cza2000.github.io/2022/mit-6.824-lab3-raftkv/</link>
         <pubDate>Thu, 03 Feb 2022 15:06:21 +0800</pubDate>
