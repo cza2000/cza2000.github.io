@@ -103,7 +103,7 @@
         
         <div>
             <time class="article-words">
-                5228字
+                4909字
             </time>
         </div>
         
@@ -331,8 +331,8 @@ Test: Check Same config on servers ...
   ... Passed
 PASS
 ok  	6.824/shardctrler	5.641s
-</code></pre><h3 id="server-1">server</h3>
-<h4 id="整体结构">整体结构</h4>
+</code></pre><h2 id="shardkv">ShardKV</h2>
+<h3 id="整体结构">整体结构</h3>
 <p><code>ShardKV</code> 的状态机 db 由多个 Shard 组成，每个 Shard 包含了自己的状态、kv和客户端请求去重表，这使得不同的 Shard 之间可以在独立迁移的同时不影响未受影响的 Shard 对外正常提供服务，也可以通过 Shard 的状态来进行许多判断，每个状态的含义在注释中。</p>
 <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#8be9fd;font-style:italic">type</span> ShardKV <span style="color:#8be9fd;font-style:italic">struct</span> {
 	mu           sync.RWMutex
@@ -508,13 +508,13 @@ ok  	6.824/shardctrler	5.641s
 		}
 	}
 }
-</code></pre></div><h4 id="客户端请求">客户端请求</h4>
-<p>这里和lab3基本一样，不同的是handle RPC 以及日志apply时都需要额外判断在当前版本的 Config 下本 Group 是否负责该 key 所属的 Shard。</p>
+</code></pre></div><h3 id="客户端请求">客户端请求</h3>
+<p>这里和lab3基本一样，不同的是 handle RPC 以及日志apply时都需要额外判断在当前版本的 Config 下本 Group 是否负责该 key 所属的 Shard。</p>
 <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#8be9fd;font-style:italic">func</span> (kv <span style="color:#ff79c6">*</span>ShardKV) <span style="color:#50fa7b">isShardMatch</span>(shardId <span style="color:#8be9fd">int</span>) <span style="color:#8be9fd">bool</span> {
 	<span style="color:#ff79c6">return</span> kv.currConfig.Shards[shardId] <span style="color:#ff79c6">==</span> kv.gid <span style="color:#ff79c6">&amp;&amp;</span> (kv.db[shardId].Status <span style="color:#ff79c6">==</span> Serving <span style="color:#ff79c6">||</span> kv.db[shardId].Status <span style="color:#ff79c6">==</span> Waiting)
 }
-</code></pre></div><h4 id="配置更新">配置更新</h4>
-<p>每个 Group 中的 leader 需要在后台启动一个协程向 ShardCtrler 定时使用 <code>Query</code> 拉取最新配置，一旦拉取到就需要提交一条 raft 日志，以在每台机器上更新配置。</p>
+</code></pre></div><h3 id="配置更新">配置更新</h3>
+<p>每个 Group 中的 leader 需要在后台启动一个协程向 ShardCtrler 定时使用 <code>Query</code> 拉取最新的 Config，一旦拉取到就需要提交一条 raft 日志，以在每台机器上更新配置。</p>
 <p>此外，每次只能拉取高一个版本的配置，而且为了防止集群的分片状态被覆盖，从而使得某些任务永远不会被执行，只有在每一 Shard 的状态都为 <code>Serving</code> 或 <code>Invalid</code> 时才能拉取、更新配置。</p>
 <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#8be9fd;font-style:italic">func</span> (kv <span style="color:#ff79c6">*</span>ShardKV) <span style="color:#50fa7b">fetchConfig</span>() {
 	canFetchConf <span style="color:#ff79c6">:=</span> <span style="color:#ff79c6">true</span>
@@ -536,37 +536,8 @@ ok  	6.824/shardctrler	5.641s
 	}
 }
 </code></pre></div><p>在每台机器上，新配置对应的 raft 日志被 commit 之后，都需要更新本地的 <code>prevConfig</code> 和 <code>currConfig</code>，以及更新 db 中对应的 Shard 状态，以便让数据拉取、数据清理协程能检测到去进行数据迁移。</p>
-<p>在新版本的 Config 中新增的 Shard 状态改为 Pulling，等待拉取数据协程去其他 Group 上拉数据。失去的 Shard 状态改为 Erasing，等待其他 Group 来拉取数据。</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#8be9fd;font-style:italic">func</span> (kv <span style="color:#ff79c6">*</span>ShardKV) <span style="color:#50fa7b">applyConfChange</span>(conf shardctrler.Config, index <span style="color:#8be9fd">int</span>) {
-	<span style="color:#ff79c6">if</span> conf.Num <span style="color:#ff79c6">!=</span> kv.currConfig.Num<span style="color:#ff79c6">+</span><span style="color:#bd93f9">1</span> {
-		<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[Group %d][Server %d] discard out-of-date conf change in apply Msg [index %d]&#34;</span>, kv.gid, kv.me, index)
-	} <span style="color:#ff79c6">else</span> {
-		kv.prevConfig = kv.currConfig
-		kv.currConfig = conf
-		<span style="color:#ff79c6">for</span> shardID, gid <span style="color:#ff79c6">:=</span> <span style="color:#ff79c6">range</span> kv.currConfig.Shards {
-			<span style="color:#ff79c6">if</span> gid <span style="color:#ff79c6">!=</span> kv.gid {
-				kv.db[shardID].Status = Invalid
-			} <span style="color:#ff79c6">else</span> {
-				kv.db[shardID].Status = Serving
-			}
-		}
-
-		<span style="color:#ff79c6">if</span> kv.prevConfig.Num <span style="color:#ff79c6">!=</span> <span style="color:#bd93f9">0</span> {
-			<span style="color:#ff79c6">for</span> i, shard <span style="color:#ff79c6">:=</span> <span style="color:#ff79c6">range</span> kv.db {
-				<span style="color:#ff79c6">if</span> kv.prevConfig.Shards[i] <span style="color:#ff79c6">!=</span> kv.gid <span style="color:#ff79c6">&amp;&amp;</span> kv.currConfig.Shards[i] <span style="color:#ff79c6">==</span> kv.gid {
-					shard.Status = Pulling
-				}
-
-				<span style="color:#ff79c6">if</span> kv.prevConfig.Shards[i] <span style="color:#ff79c6">==</span> kv.gid <span style="color:#ff79c6">&amp;&amp;</span> kv.currConfig.Shards[i] <span style="color:#ff79c6">!=</span> kv.gid {
-					shard.Status = Erasing
-				}
-			}
-		}
-
-		<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[Group %d][Server %d] apply latest config [ver %d shards %+v] in apply Msg [index %d]&#34;</span>, kv.gid, kv.me, conf.Num, conf.Shards, index)
-	}
-}
-</code></pre></div><h4 id="数据拉取">数据拉取</h4>
+<p>在新版本的 Config 中新增的 Shard 状态改为 Pulling，等待拉取数据协程去其他 Group 上拉数据。失去的 Shard 状态改为 Erasing，等待其他 Group 来拉取数据。若当前 Config 的版本为1，则代表集群刚初始化，不需要去其他 Group 拉取数据，只需更改对应的 Shard 状态为 Serving。</p>
+<h3 id="数据拉取">数据拉取</h3>
 <p>新的 Config 在 applier 协程中被应用并不表示所属分片可以立刻对外提供服务，还需要等待在上一个版本的 Config 中不属于自身的 Shard 从它之前所属的 Group 中迁移到本 Group。</p>
 <p>这里显然不能在配置更新时同步阻塞的去拉取 Shard，这会阻塞 applier 协程，严重影响对外服务的可用性。那么是否可以异步的去拉取数据并提交日志？其实不行，leader 可能会在 apply 新配置之后到新数据被异步拉取到并提交日志之前宕机，而 follower 虽然会 apply 配置但是不会去拉数据，这样这些数据将永远无法被更新。</p>
 <p>因此，我们不能在 apply 配置的时候启动异步任务，而是应该只更新 shard 的状态，由单独的后台协程去检测每个 Shard 的状态，从而判断是否需要并执行分片迁移，分片清理等任务。为了让单独的协程能知道该向哪个 Group 去拉取数据或让它去删除数据，<code>ShardKV</code> 需要维护 currConfig 和 prevConfig，这样其他协程能够通过它们来得知所有 Shard 的 ex-owner。</p>
@@ -611,7 +582,7 @@ ok  	6.824/shardctrler	5.641s
 	kv.mu.<span style="color:#50fa7b">RUnlock</span>()
 	wg.<span style="color:#50fa7b">Wait</span>()
 }
-</code></pre></div><p>只有在 PullDataRequest 中的配置版本与自身的配置版本相同时，才回应其需要的 Shard 信息。需要注意正确的对所有 Shard 深拷贝。</p>
+</code></pre></div><p>数据的被拉取方在处理 RPC 时，只有在 PullDataRequest 中的配置版本与自身的配置版本相同时，才回应其需要的 Shard 信息。需要注意正确的对所有 Shard 深拷贝。</p>
 <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#8be9fd;font-style:italic">func</span> (kv <span style="color:#ff79c6">*</span>ShardKV) <span style="color:#50fa7b">PullData</span>(args <span style="color:#ff79c6">*</span>PullDataRequest, reply <span style="color:#ff79c6">*</span>PullDataResponse) {
 	<span style="color:#ff79c6">defer</span> <span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[Group %d][Server %d] reply %s for PULL DATA request %s&#34;</span>, kv.gid, kv.me, reply, args)
 	<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[Group %d][Server %d] received a PULL DATA request %s&#34;</span>, kv.gid, kv.me, args)
@@ -643,28 +614,10 @@ ok  	6.824/shardctrler	5.641s
 	reply.Shards = replyShards
 	reply.Err = OK
 }
-</code></pre></div><p>为了保证集群数据变更的幂等性，apply 时也要保证 Config 的版本与当前版本相同以及其 Shard 的本地状态为 <code>Pulling</code>，将其状态改为 <code>Waiting</code> 让数据清理协程去检测。</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#8be9fd;font-style:italic">func</span> (kv <span style="color:#ff79c6">*</span>ShardKV) <span style="color:#50fa7b">applyInsertData</span>(resp PullDataResponse, index <span style="color:#8be9fd">int</span>) {
-	<span style="color:#ff79c6">if</span> resp.ConfNum <span style="color:#ff79c6">==</span> kv.currConfig.Num {
-		<span style="color:#ff79c6">for</span> shardID, shard <span style="color:#ff79c6">:=</span> <span style="color:#ff79c6">range</span> resp.Shards {
-			<span style="color:#ff79c6">if</span> kv.db[shardID].Status <span style="color:#ff79c6">==</span> Pulling {
-				<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[Group %d][Server %d] start to serve shard %d&#34;</span>, kv.gid, kv.me, shardID)
-				kv.db[shardID] = <span style="color:#50fa7b">deepCopyShard</span>(shard)
-				kv.db[shardID].Status = Waiting
-			} <span style="color:#ff79c6">else</span> {
-				<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[Group %d][Server %d] encounter duplicated insert data [shardID %d status %s] in apply Msg [index %d]&#34;</span>, kv.gid, kv.me, shardID, ShardStatusName[shard.Status], index)
-				<span style="color:#ff79c6">return</span>
-			}
-		}
-		<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[Group %d][Server %d] apply insert data in apply Msg [index %d]&#34;</span>, kv.gid, kv.me, index)
-	} <span style="color:#ff79c6">else</span> {
-		<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[Group %d][Server %d] discard out-of-date insert data in apply Msg [index %d]&#34;</span>, kv.gid, kv.me, index)
-	}
-
-}
-</code></pre></div><h4 id="数据清理">数据清理</h4>
-<h5 id="current-owner">current owner</h5>
-<p>在完成数据拉取之后，需要清理掉每个新拉到的 Shard 对应的 ex-owner 机器上的旧数据。后台协程检查所有状态为 <code>Waiting</code> 的 Shard，并行向它们的 ex-owners 分别发送 RPC，告知它们：我已拉取到我要的数据，现在你可以把它们删了。这里 waitGroup 的用法同上。</p>
+</code></pre></div><p>在 applyInsertData 时，为了保证集群数据变更的幂等性，要保证 Config 的版本与当前版本相同时以及其 Shard 的本地状态为 <code>Pulling</code> 时才能更新 Shard 的状态。将其状态改为 <code>Waiting</code> 让数据清理协程去检测。</p>
+<h3 id="数据清理">数据清理</h3>
+<h4 id="current-owner">current owner</h4>
+<p>在完成数据拉取之后，需要清理掉每个新拉到的 Shard 对应的 ex-owner 机器上的旧数据。后台协程检查所有状态为 <code>Waiting</code> 的 Shard，并行向它们的 ex-owners 分别发送 RPC，告知它们：我已拉取到我要的数据，现在你可以把它们（对应的 Shard 状态为 Erasing）删了。这里 waitGroup 的用法同上。</p>
 <p>RPC返回且得知 ex-owners 上的数据清理已经完成后需要提交一条 <code>StopWaiting</code> 类型的 raft 日志，将这个信息同步到 Group 内所有机器上。</p>
 <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#8be9fd;font-style:italic">type</span> EraseDataRequest <span style="color:#8be9fd;font-style:italic">struct</span> {
 	ConfNum  <span style="color:#8be9fd">int</span>
@@ -704,25 +657,9 @@ ok  	6.824/shardctrler	5.641s
 	kv.mu.<span style="color:#50fa7b">RUnlock</span>()
 	wg.<span style="color:#50fa7b">Wait</span>()
 }
-</code></pre></div><p><code>StopWaiting</code> 日志以及 Shard 的 <code>Waiting</code> 状态存在的意义是能够标记我是否已经成功在 ex-owner 上删除过期的 Shard。apply 时将对应的状态为 <code>Waiting</code> 的 Shard 更新状态为 <code>Serving</code>。</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#8be9fd;font-style:italic">func</span> (kv <span style="color:#ff79c6">*</span>ShardKV) <span style="color:#50fa7b">applyStopWaiting</span>(req EraseDataRequest, index <span style="color:#8be9fd">int</span>) {
-	<span style="color:#ff79c6">if</span> req.ConfNum <span style="color:#ff79c6">==</span> kv.currConfig.Num {
-		<span style="color:#ff79c6">for</span> _, shardID <span style="color:#ff79c6">:=</span> <span style="color:#ff79c6">range</span> req.ShardIDs {
-			<span style="color:#ff79c6">if</span> kv.db[shardID].Status <span style="color:#ff79c6">==</span> Waiting {
-				kv.db[shardID].Status = Serving
-				<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[Group %d][Server %d] erase shard %d on its ex-owner&#34;</span>, kv.gid, kv.me, shardID)
-			} <span style="color:#ff79c6">else</span> {
-				<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[Group %d][Server %d] encounter duplicated stop waiting in apply Msg [index %d]&#34;</span>, kv.gid, kv.me, index)
-				<span style="color:#ff79c6">break</span>
-			}
-		}
-		<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[Group %d][Server %d] apply stop waiting in apply Msg [index %d]&#34;</span>, kv.gid, kv.me, index)
-	} <span style="color:#ff79c6">else</span> {
-		<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[Group %d][Server %d] discard out-of-date stop waiting in apply Msg [index %d]&#34;</span>, kv.gid, kv.me, index)
-	}
-}
-</code></pre></div><h5 id="ex-owner">ex-owner</h5>
-<p>ex-owner 在处理 <code>EraseData</code> 的RPC时，需要返回数据清理是否完成，这里的处理类似处理客户端请求。</p>
+</code></pre></div><p><code>StopWaiting</code> 日志以及 Shard 的 <code>Waiting</code> 状态存在的用途是标记我是否已经成功在 ex-owner 上删除过期的 Shard。applyStopWaiting 时，在 Config 版本相同时将对应的状态为 <code>Waiting</code> 的 Shard 更新状态为 <code>Serving</code>。</p>
+<h4 id="ex-owner">ex-owner</h4>
+<p>ex-owner 在 handle <code>EraseData</code> 的RPC时，需要返回数据清理是否完成，这里的处理类似处理客户端请求，不需要进行去重。</p>
 <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#8be9fd;font-style:italic">func</span> (kv <span style="color:#ff79c6">*</span>ShardKV) <span style="color:#50fa7b">EraseData</span>(req <span style="color:#ff79c6">*</span>EraseDataRequest, resp <span style="color:#ff79c6">*</span>EraseDataResponse) {
 	<span style="color:#ff79c6">defer</span> <span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[Group %d][Server %d] resp %s for ERASE DATA request %s&#34;</span>, kv.gid, kv.me, resp, req)
 	<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[Group %d][Server %d] received a ERASE DATA request %s&#34;</span>, kv.gid, kv.me, req)
@@ -750,30 +687,8 @@ ok  	6.824/shardctrler	5.641s
 		kv.mu.<span style="color:#50fa7b">Unlock</span>()
 	}()
 }
-</code></pre></div><p>apply 时将对应的状态为 <code>Erasing</code> 的 Shard 更新为 <code>Invalid</code>，清空 kv 和客户端请求去重表。</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#8be9fd;font-style:italic">func</span> (kv <span style="color:#ff79c6">*</span>ShardKV) <span style="color:#50fa7b">applyEraseData</span>(req EraseDataRequest, index <span style="color:#8be9fd">int</span>) <span style="color:#ff79c6">*</span>CommandResponse {
-	<span style="color:#ff79c6">if</span> req.ConfNum <span style="color:#ff79c6">==</span> kv.currConfig.Num {
-		<span style="color:#ff79c6">for</span> _, shardID <span style="color:#ff79c6">:=</span> <span style="color:#ff79c6">range</span> req.ShardIDs {
-			<span style="color:#ff79c6">if</span> kv.db[shardID].Status <span style="color:#ff79c6">==</span> Erasing {
-				kv.db[shardID] = <span style="color:#ff79c6">&amp;</span>Shard{
-					Status: Invalid,
-				}
-				<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[Group %d][Server %d] erase data [shardID %d] for config [ver %d] in apply Msg [index %d]&#34;</span>, kv.gid, kv.me, shardID, kv.currConfig.Num, index)
-			} <span style="color:#ff79c6">else</span> {
-				<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[Group %d][Server %d] encounter duplicated erase data in apply Msg [index %d]&#34;</span>, kv.gid, kv.me, index)
-				<span style="color:#ff79c6">return</span> <span style="color:#ff79c6">&amp;</span>CommandResponse{OK, <span style="color:#f1fa8c">&#34;&#34;</span>}
-			}
-		}
-		<span style="color:#ff79c6">return</span> <span style="color:#ff79c6">&amp;</span>CommandResponse{OK, <span style="color:#f1fa8c">&#34;&#34;</span>}
-	} <span style="color:#ff79c6">else</span> <span style="color:#ff79c6">if</span> req.ConfNum &gt; kv.currConfig.Num {
-		<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[Group %d][Server %d] current config [ver %d], not ready for erase data request [ver %d] in apply Msg [index %d]&#34;</span>, kv.gid, kv.me, kv.currConfig.Num, req.ConfNum, index)
-		<span style="color:#ff79c6">return</span> <span style="color:#ff79c6">&amp;</span>CommandResponse{ErrNotReady, <span style="color:#f1fa8c">&#34;&#34;</span>}
-	} <span style="color:#ff79c6">else</span> {
-		<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[Group %d][Server %d] discard out-of-date erase data in apply Msg [index %d]&#34;</span>, kv.gid, kv.me, index)
-		<span style="color:#ff79c6">return</span> <span style="color:#ff79c6">&amp;</span>CommandResponse{OK, <span style="color:#f1fa8c">&#34;&#34;</span>}
-	}
-}
-</code></pre></div><h4 id="提交空日志">提交空日志</h4>
+</code></pre></div><p>apply 时，在版本号相同的情况下将对应的状态为 <code>Erasing</code> 的 Shard 更新为 <code>Invalid</code>，表明对应 Shard 已经成功被清除，清空 kv 和客户端请求去重表。不要忘了返回OK。</p>
+<h3 id="提交空日志">提交空日志</h3>
 <p>在某个涉及重启的测试中，有时候会出现集群对外出现活锁，无法再服务请求直到超时。我重新打了很多日志，发现这时各个 Group 间的 Config 版本不一致，且版本较低的 Group 的一些 Shard 状态不为 <code>Serving</code> 和 <code>Invalid</code>，这卡着配置更新协程无法拉取最新的 Config。按理说 Config 的版本只能以1为公差递增，其余的 Group 版本高说明也经历过较低的这个版本，应该有向这个 Group 发送过拉取数据和清理数据的RPC来更新 Shard 状态，那么为什么状态并没有被更新呢？</p>
 <p>仔细读了很久日志，我发现版本较低的 Group 在推进 Config 到这个版本之后已经正确处理过拉取数据或是清理数据的RPC也更新了 Shard 状态，但在重启后这最后处理的关键RPC对应的日志并没有重新被commit。原来，此时 leader 的 currentTerm 高于这个RPC对应的日志的 term，且这个时间节点客户端碰巧没有向该 Group 组执行读写请求，导致 leader 无法拥有当前任期的 term 的日志，无法将状态机更新到最新。</p>
 <p>lab4的最后一部分是我在写完 TinyKV 之后做的，我想到 TinyKV （其实 etcd 也是这么做的）中要求的 leader 在当选时要先提交一条空日志，这样可以保证集群的可用性，于是我也移植了这个特性到 6.824 中。</p>
@@ -1073,16 +988,21 @@ ok  	6.824/shardkv	108.040s
           </ol>
         </li>
         <li><a href="#测试结果">测试结果</a></li>
-        <li><a href="#server-1">server</a>
+      </ol>
+    </li>
+    <li><a href="#shardkv">ShardKV</a>
+      <ol>
+        <li><a href="#整体结构">整体结构</a></li>
+        <li><a href="#客户端请求">客户端请求</a></li>
+        <li><a href="#配置更新">配置更新</a></li>
+        <li><a href="#数据拉取">数据拉取</a></li>
+        <li><a href="#数据清理">数据清理</a>
           <ol>
-            <li><a href="#整体结构">整体结构</a></li>
-            <li><a href="#客户端请求">客户端请求</a></li>
-            <li><a href="#配置更新">配置更新</a></li>
-            <li><a href="#数据拉取">数据拉取</a></li>
-            <li><a href="#数据清理">数据清理</a></li>
-            <li><a href="#提交空日志">提交空日志</a></li>
+            <li><a href="#current-owner">current owner</a></li>
+            <li><a href="#ex-owner">ex-owner</a></li>
           </ol>
         </li>
+        <li><a href="#提交空日志">提交空日志</a></li>
         <li><a href="#测试结果-1">测试结果</a></li>
       </ol>
     </li>
