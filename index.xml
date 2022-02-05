@@ -2,16 +2,16 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
     <channel>
         <title>陈子桉的博客</title>
-        <link>https://cza2000.github.io/</link>
+        <link>https://ziannchen.work/</link>
         <description>Recent content on 陈子桉的博客</description>
         <generator>Hugo -- gohugo.io</generator>
         <language>zh-CN</language>
-        <lastBuildDate>Fri, 04 Feb 2022 13:21:03 +0800</lastBuildDate><atom:link href="https://cza2000.github.io/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Fri, 04 Feb 2022 13:21:03 +0800</lastBuildDate><atom:link href="https://ziannchen.work/index.xml" rel="self" type="application/rss+xml" /><item>
         <title>mit-6.824 lab4: ShardKV</title>
-        <link>https://cza2000.github.io/2022/mit-6.824-lab4-shardkv/</link>
+        <link>https://ziannchen.work/2022/mit-6.824-lab4-shardkv/</link>
         <pubDate>Fri, 04 Feb 2022 13:21:03 +0800</pubDate>
         
-        <guid>https://cza2000.github.io/2022/mit-6.824-lab4-shardkv/</guid>
+        <guid>https://ziannchen.work/2022/mit-6.824-lab4-shardkv/</guid>
         <description>&lt;p&gt;lab课程网址 &lt;a class=&#34;link&#34; href=&#34;https://pdos.csail.mit.edu/6.824/labs/lab-shard.html&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;https://pdos.csail.mit.edu/6.824/labs/lab-shard.html&lt;/a&gt;&lt;/p&gt;
 &lt;p&gt;本次lab是最难的一次lab，很多地方需要我们自由发挥，不像lab2那样可以参考论文。&lt;/p&gt;
@@ -21,8 +21,8 @@
 &lt;p&gt;我画了一个 ShardKV 最终的结构图&lt;/p&gt;
 &lt;p&gt;&lt;figure 
 	&gt;
-	&lt;a href=&#34;https://cza2000.github.io/img/ShardKV/1.png&#34; &gt;
-		&lt;img src=&#34;https://cza2000.github.io/img/ShardKV/1.png&#34;
+	&lt;a href=&#34;https://ziannchen.work/img/ShardKV/1.png&#34; &gt;
+		&lt;img src=&#34;https://ziannchen.work/img/ShardKV/1.png&#34;
 			
 			
 			
@@ -616,10 +616,10 @@ ok  	6.824/shardkv	108.040s
         </item>
         <item>
         <title>mit-6.824 lab3: RaftKV</title>
-        <link>https://cza2000.github.io/2022/mit-6.824-lab3-raftkv/</link>
+        <link>https://ziannchen.work/2022/mit-6.824-lab3-raftkv/</link>
         <pubDate>Thu, 03 Feb 2022 15:06:21 +0800</pubDate>
         
-        <guid>https://cza2000.github.io/2022/mit-6.824-lab3-raftkv/</guid>
+        <guid>https://ziannchen.work/2022/mit-6.824-lab3-raftkv/</guid>
         <description>&lt;h1 id=&#34;lab3-kvraft&#34;&gt;Lab3: KVRaft&lt;/h1&gt;
 &lt;p&gt;lab链接 &lt;a class=&#34;link&#34; href=&#34;https://pdos.csail.mit.edu/6.824/labs/lab-kvraft.html&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;https://pdos.csail.mit.edu/6.824/labs/lab-kvraft.html&lt;/a&gt;&lt;/p&gt;
@@ -869,10 +869,10 @@ ok  	6.824/kvraft	151.660s
         </item>
         <item>
         <title>mit-6.824 lab2: Raft</title>
-        <link>https://cza2000.github.io/2022/mit-6.824-lab2-raft/</link>
+        <link>https://ziannchen.work/2022/mit-6.824-lab2-raft/</link>
         <pubDate>Thu, 03 Feb 2022 15:04:30 +0800</pubDate>
         
-        <guid>https://cza2000.github.io/2022/mit-6.824-lab2-raft/</guid>
+        <guid>https://ziannchen.work/2022/mit-6.824-lab2-raft/</guid>
         <description>&lt;h1 id=&#34;lab2-raft&#34;&gt;Lab2: Raft&lt;/h1&gt;
 &lt;p&gt;lab原链接 &lt;a class=&#34;link&#34; href=&#34;https://pdos.csail.mit.edu/6.824/labs/lab-raft.html&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;https://pdos.csail.mit.edu/6.824/labs/lab-raft.html&lt;/a&gt;&lt;/p&gt;
@@ -1302,10 +1302,10 @@ ok  	6.824/raft	177.243s
         </item>
         <item>
         <title>mit-6.824 lab1: MapReduce</title>
-        <link>https://cza2000.github.io/2022/mit-6.824-lab1-mapreduce/</link>
+        <link>https://ziannchen.work/2022/mit-6.824-lab1-mapreduce/</link>
         <pubDate>Thu, 03 Feb 2022 15:01:24 +0800</pubDate>
         
-        <guid>https://cza2000.github.io/2022/mit-6.824-lab1-mapreduce/</guid>
+        <guid>https://ziannchen.work/2022/mit-6.824-lab1-mapreduce/</guid>
         <description>&lt;h1 id=&#34;lab1-mapreduce&#34;&gt;Lab1: MapReduce&lt;/h1&gt;
 &lt;p&gt;在本次lab中我们的任务是实现一个分布式的MapReduce，它由两个程序组成，Coordinator和Worker。只有一个Coordinator，一个或多个Worker并行执行。&lt;/p&gt;
 &lt;p&gt;每个Worker将通过RPC与Coordinator通信以请求一个Map或Reduce任务，之后从一个或多个文件中读取任务的输入，执行任务，并将任务的输出写入一个或多个文件。&lt;/p&gt;
@@ -1468,10 +1468,10 @@ ok  	6.824/raft	177.243s
         </item>
         <item>
         <title>mit-6.824 lab0: Preface</title>
-        <link>https://cza2000.github.io/2022/mit-6.824-lab0-preface/</link>
+        <link>https://ziannchen.work/2022/mit-6.824-lab0-preface/</link>
         <pubDate>Thu, 03 Feb 2022 14:01:24 +0800</pubDate>
         
-        <guid>https://cza2000.github.io/2022/mit-6.824-lab0-preface/</guid>
+        <guid>https://ziannchen.work/2022/mit-6.824-lab0-preface/</guid>
         <description>&lt;h2 id=&#34;前言&#34;&gt;前言&lt;/h2&gt;
 &lt;p&gt;21年的3月份，大三下学期，我收到了一份暑期实习的offer。需要提前学习一下go语言，之后在某学长的安利下我了解到了mit-6.824这门课程，他建议我做一下这门课的4个lab就当实践一下go。不过我配好环境后就去浪了2333，也就断断续续的在b站上看了几期课的视频。&lt;/p&gt;
 &lt;p&gt;真正开始写lab还是暑假实习在公司摸鱼的时候开始的，当时还拉着旁边组的一个实习生一起写相互交流进度。不得不说，课程、论文和lab真的都是非常非常的硬核（虽然我论文只大概看了前几篇），分布式系统这个领域也真的是非常非常的有趣，比学校里学的东西不知道高到哪里去了。暑假结束时还只写完了lab2，lab3只写了一点点，之后由于搞完秋招后一直在玩，年底又去写PingCAP talent-plan的tinykv了（这个也挺有意思的，也更贴近工业界，可惜文档给的太少，与之相比6.824的实现就像个玩具）导致进度很慢，最终22年1月中旬才全部写完。&lt;/p&gt;
@@ -1527,10 +1527,10 @@ rm -rf /tmp/fd1
         </item>
         <item>
         <title>Hugo&amp;Stack &#43; Github Pages &#43; Github Actions 建站记录</title>
-        <link>https://cza2000.github.io/2022/hugostack-github-pages-github-actions-%E5%BB%BA%E7%AB%99%E8%AE%B0%E5%BD%95/</link>
+        <link>https://ziannchen.work/2022/hugostack-github-pages-github-actions-%E5%BB%BA%E7%AB%99%E8%AE%B0%E5%BD%95/</link>
         <pubDate>Mon, 31 Jan 2022 14:38:17 +0800</pubDate>
         
-        <guid>https://cza2000.github.io/2022/hugostack-github-pages-github-actions-%E5%BB%BA%E7%AB%99%E8%AE%B0%E5%BD%95/</guid>
+        <guid>https://ziannchen.work/2022/hugostack-github-pages-github-actions-%E5%BB%BA%E7%AB%99%E8%AE%B0%E5%BD%95/</guid>
         <description>&lt;h2 id=&#34;开端&#34;&gt;开端&lt;/h2&gt;
 &lt;p&gt;一个程序员怎么能没有一个属于自己的技术博客呢？念叨这句话很久了，22年的春节我终于新建了文件夹。&lt;/p&gt;
 &lt;h2 id=&#34;技术栈选型&#34;&gt;技术栈选型&lt;/h2&gt;
