@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content='构建一个单点的 key / value 存储 gRPC 服务'><title>TinyKV Project1: StandaloneKV</title>
+
+<link rel='canonical' href='https://ziannchen.work/2022/tinykv-project1-standalonekv/'>
+
+<link rel="stylesheet" href="/scss/style.min.0f551e1e8f12e484db7a1602fcb8eced03029344f0e9cedaf9073100eb80d3e8.css"><meta property='og:title' content='TinyKV Project1: StandaloneKV'>
+<meta property='og:description' content='构建一个单点的 key / value 存储 gRPC 服务'>
+<meta property='og:url' content='https://ziannchen.work/2022/tinykv-project1-standalonekv/'>
+<meta property='og:site_name' content='陈子桉的博客'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='分布式系统' /><meta property='article:published_time' content='2022-02-05T21:04:35&#43;08:00'/><meta property='article:modified_time' content='2022-02-05T21:04:35&#43;08:00'/><meta property='og:image' content='https://ziannchen.work/img/avatar.png' />
+<meta name="twitter:title" content="TinyKV Project1: StandaloneKV">
+<meta name="twitter:description" content="构建一个单点的 key / value 存储 gRPC 服务"><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://ziannchen.work/img/avatar.png' />
+    </head>
+    <body class="
+    article-page has-toc
+">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex 
+    
+        extended
+    
+">
+    
+        <div id="article-toolbar">
+            <a href="/" class="back-home">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="15 6 9 12 15 18" />
+</svg>
+
+
+
+                <span>Back</span>
+            </a>
+        </div>
+    
+<main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+    <header class="article-category">
+        
+        <a href="/categories/pingcap-talent-plan/" >
+            PingCAP talent-plan
+        </a>
+        
+    </header>
+    
+
+    <h2 class="article-title">
+        <a href="/2022/tinykv-project1-standalonekv/">TinyKV Project1: StandaloneKV</a>
+    </h2>
+
+    
+    <h3 class="article-subtitle">
+        构建一个单点的 key / value 存储 gRPC 服务
+    </h3>
+    
+
+    
+    <footer class="article-time">
+        
+        <div>
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+            <time class="article-time--published">Feb 05, 2022</time>
+        </div>
+        
+
+        
+        <div>
+            <time class="article-words">
+                630字
+            </time>
+        </div>
+        
+        <div>
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+            <span id="busuanzi_container_page_pv" style='display:none'>
+                本文总访问量<span id="busuanzi_value_page_pv"></span>次
+            </span>
+        </div>
+    </footer>
+    
+</div>
+</header>
+
+    <section class="article-content">
+    
+    
+    <p>在本项目中，我们将在 <code>column family</code> 的支持下构建一个独立的 key / value 存储gRPC服务。在 <code>kv/main.go</code> 中我们初始化了一个 <code>gRPC</code> server，它包含了一个 <code>tintkv.Server</code> ，提供名为 <code>TinyKV</code> 的 <code>gRPC</code> 服务。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go">	server <span style="color:#ff79c6">:=</span> server.<span style="color:#50fa7b">NewServer</span>(storage)
+
+   <span style="color:#8be9fd;font-style:italic">var</span> alivePolicy = keepalive.EnforcementPolicy{
+   	MinTime:             <span style="color:#bd93f9">2</span> <span style="color:#ff79c6">*</span> time.Second, <span style="color:#6272a4">// If a client pings more than once every 2 seconds, terminate the connection
+</span><span style="color:#6272a4"></span>   	PermitWithoutStream: <span style="color:#ff79c6">true</span>,            <span style="color:#6272a4">// Allow pings even when there are no active streams
+</span><span style="color:#6272a4"></span>   }
+
+   grpcServer <span style="color:#ff79c6">:=</span> grpc.<span style="color:#50fa7b">NewServer</span>(
+   	grpc.<span style="color:#50fa7b">KeepaliveEnforcementPolicy</span>(alivePolicy),
+   	grpc.<span style="color:#50fa7b">InitialWindowSize</span>(<span style="color:#bd93f9">1</span><span style="color:#ff79c6">&lt;&lt;</span><span style="color:#bd93f9">30</span>),
+   	grpc.<span style="color:#50fa7b">InitialConnWindowSize</span>(<span style="color:#bd93f9">1</span><span style="color:#ff79c6">&lt;&lt;</span><span style="color:#bd93f9">30</span>),
+   	grpc.<span style="color:#50fa7b">MaxRecvMsgSize</span>(<span style="color:#bd93f9">10</span><span style="color:#ff79c6">*</span><span style="color:#bd93f9">1024</span><span style="color:#ff79c6">*</span><span style="color:#bd93f9">1024</span>),
+   )
+   tinykvpb.<span style="color:#50fa7b">RegisterTinyKvServer</span>(grpcServer, server)
+</code></pre></div><p>其中，<code>server</code> 依赖于一个 <code>storage</code> ，它是一个接口，可以根据配置文件选择raft存储实现或者单机存储实现。</p>
+<p>我们通过两步来完成这个项目：</p>
+<ol>
+<li>实现一个单机存储引擎。</li>
+<li>实现原始的kv服务handler。</li>
+</ol>
+<h2 id="实现一个单机存储引擎">实现一个单机存储引擎。</h2>
+<p>我们需要用一个单机存储引擎来实现这个接口：</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#6272a4">// Storage represents the internal-facing server part of TinyKV, it handles sending and receiving from other
+</span><span style="color:#6272a4">// TinyKV nodes. As part of that responsibility, it also reads and writes data to disk (or semi-permanent memory).
+</span><span style="color:#6272a4"></span><span style="color:#8be9fd;font-style:italic">type</span> Storage <span style="color:#8be9fd;font-style:italic">interface</span> {
+	<span style="color:#50fa7b">Start</span>() <span style="color:#8be9fd">error</span>
+	<span style="color:#50fa7b">Stop</span>() <span style="color:#8be9fd">error</span>
+	<span style="color:#50fa7b">Write</span>(ctx <span style="color:#ff79c6">*</span>kvrpcpb.Context, batch []Modify) <span style="color:#8be9fd">error</span>
+	<span style="color:#50fa7b">Reader</span>(ctx <span style="color:#ff79c6">*</span>kvrpcpb.Context) (StorageReader, <span style="color:#8be9fd">error</span>)
+}
+</code></pre></div><p>代码位于 <code>kv/storage/standalone_storage/standalone_storage.go</code> 中。我们底层的存储服务使用了 <code>badger</code> ，因此实现 <code>Storage</code> 接口只需对 <code>badger</code> 的api进行封装。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#8be9fd;font-style:italic">type</span> StandAloneStorage <span style="color:#8be9fd;font-style:italic">struct</span> {
+	<span style="color:#6272a4">// Your Data Here (1).
+</span><span style="color:#6272a4"></span>	db <span style="color:#ff79c6">*</span>badger.DB
+}
+</code></pre></div><p><code>Reader</code> 方法中直接返回一个 <code>StandAloneStorageReader</code> 即可，其中包含了一个 <code>badger.Txn</code> 是一个事务接口，提供了读时的快照。</p>
+<p><code>Write</code> 方法需要一次性 <code>batch</code> 中的所有写入或是删除操作写入数据库。需要使用一个 <code>WriteBatch</code> 记录下所有写操作，最后使用 <code>WriteBatch.WriteToDB</code> 方法一次性写入 <code>badger</code>。<code>badger</code> 并不支持 <code>column family</code>，因此tinykv在不同 <code>column family</code> 上的区分只是为把不同 <code>column family</code> 的key在编码时加上不同的前缀。</p>
+<h2 id="实现原始的kv服务handler">实现原始的kv服务handler。</h2>
+<p>我们需要使用刚刚实现的单机存储引擎为 <code>server</code> 实现 <code>RawGet/Put/Delete/Scan</code> 4个方法。</p>
+<p><code>RawGet</code> 方法需要使用 <code>RawGetRequest</code> 中的 <code>Context</code> 初始化一个 <code>Reader</code>，此后直接读取。</p>
+<p><code>RawPut/Delete</code> 这两个写操作需要使用 <code>storage.Modify</code> 先进行封装再调用 <code>Write</code> 写入。</p>
+<p><code>RawScan</code> 需要初始化一个迭代器 <code>Reader.IterCF</code> ，之后直接循环读取。</p>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E5%88%86%E5%B8%83%E5%BC%8F%E7%B3%BB%E7%BB%9F/">分布式系统</a>
+        
+    </section>
+
+
+    </footer>
+
+
+    
+</article>
+
+    
+
+    <aside class="related-contents--wrapper">
+    
+    
+        <h2 class="section-title">Related contents</h2>
+        <div class="related-contents">
+            <div class="flex article-list--tile">
+                
+                    
+<article class="">
+    <a href="/2022/tinykv-project4-transaction/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">TinyKV Project4: Transaction</h2>
+        </div>
+    </a>
+</article>
+                
+                    
+<article class="">
+    <a href="/2022/tinykv-project3-multiraftkv/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">TinyKV Project3: MultiRaftKV</h2>
+        </div>
+    </a>
+</article>
+                
+                    
+<article class="">
+    <a href="/2022/tinykv-project2-raftkv/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">TinyKV Project2: RaftKV</h2>
+        </div>
+    </a>
+</article>
+                
+            </div>
+        </div>
+    
+</aside>
+
+     
+    
+        
+    <script src="https://utteranc.es/client.js" 
+        repo="cza2000/cza2000.github.io"
+        issue-term="title"
+        
+        label="github-light"
+        
+        crossorigin="anonymous"
+        async
+        >
+</script>
+
+<style>
+    .utterances {
+        max-width: unset;
+    }
+</style>
+
+<script>
+    function setUtterancesTheme(theme) {
+        let utterances = document.querySelector('.utterances iframe');
+        if (utterances) {
+            utterances.contentWindow.postMessage(
+                {
+                    type: 'set-theme',
+                    theme: `github-${theme}`
+                },
+                'https://utteranc.es'
+            );
+        }
+    }
+
+    addEventListener('message', event => {
+        if (event.origin !== 'https://utteranc.es') return;
+        setUtterancesTheme(document.documentElement.dataset.scheme)
+    });
+
+    window.addEventListener('onColorSchemeChange', (e) => {
+        setUtterancesTheme(e.detail)
+    })
+</script>
+
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy;
+        
+        2022 陈子桉的博客
+
+    </section>
+
+    <section class="powerby">
+        Built with <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> <br />
+        Theme <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener"
+                data-version="3.7.0">Stack</a></b> designed by <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a>
+        <br />
+        <span id="busuanzi_container_site_uv" style='display:none'>
+            本站总访问量<span id="busuanzi_value_site_uv"></span>次
+        </span>
+    </section>
+</footer>
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.css"integrity="sha256-c0uckgykQ9v5k&#43;IqViZOZKc47Jn7KQil4/MP3ySA3F8="crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.css"integrity="sha256-SBLU4vv6CA6lHsZ1XyTdhyjJxCjPif/TRkjnsyGAGnE="crossorigin="anonymous"
+            >
+
+            </main>
+    
+        <aside class="sidebar right-sidebar sticky">
+            <section class="widget archives">
+                <div class="widget-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+                </div>
+                <h2 class="widget-title section-title">Table of contents</h2>
+                
+                <div class="widget--toc">
+                    <nav id="TableOfContents">
+  <ol>
+    <li><a href="#实现一个单机存储引擎">实现一个单机存储引擎。</a></li>
+    <li><a href="#实现原始的kv服务handler">实现原始的kv服务handler。</a></li>
+  </ol>
+</nav>
+                </div>
+            </section>
+        </aside>
+    
+
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.5/dist/vibrant.min.js"integrity="sha256-5NovOZc4iwiAWTYIFiIM7DxKUXKWvpVEuMEPLzcm5/g="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+<script src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+    </body>
+</html>

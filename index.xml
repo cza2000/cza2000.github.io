@@ -6,7 +6,554 @@
         <description>Recent content on 陈子桉的博客</description>
         <generator>Hugo -- gohugo.io</generator>
         <language>zh-CN</language>
-        <lastBuildDate>Fri, 04 Feb 2022 13:21:03 +0800</lastBuildDate><atom:link href="https://ziannchen.work/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Sat, 05 Feb 2022 21:26:29 +0800</lastBuildDate><atom:link href="https://ziannchen.work/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>TinyKV Project4: Transaction</title>
+        <link>https://ziannchen.work/2022/tinykv-project4-transaction/</link>
+        <pubDate>Sat, 05 Feb 2022 21:26:29 +0800</pubDate>
+        
+        <guid>https://ziannchen.work/2022/tinykv-project4-transaction/</guid>
+        <description>&lt;p&gt;在之前的几个 projects 中，我们已经构建起了基于 multi-raft 的分布式KV数据库。在 project 4 中，我们将构建一个事务系统以应对多个 clinet 的并发请求并保证快照隔离（snapshot isolation）。&lt;/p&gt;
+&lt;p&gt;我们将基于&lt;code&gt;Percolator&lt;/code&gt;的两阶段提交协议来构建我们的事务模型。&lt;/p&gt;
+&lt;h2 id=&#34;part-amvcc&#34;&gt;Part A：MVCC&lt;/h2&gt;
+&lt;p&gt;在part A中我们需要实现MVCC即多版本并发控制（multi-version concurrency control）。&lt;code&gt;tinykv&lt;/code&gt;的底层存储&lt;code&gt;Badger&lt;/code&gt;为我们提供了3个&lt;code&gt;column family&lt;/code&gt;：&lt;code&gt;CfDefault&lt;/code&gt;、&lt;code&gt;CfLock&lt;/code&gt;、&lt;code&gt;CfWrite&lt;/code&gt;，对应了论文中提到的3个列：&lt;code&gt;data&lt;/code&gt;、&lt;code&gt;lock&lt;/code&gt;、&lt;code&gt;write&lt;/code&gt;。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;CfDefault&lt;/code&gt;：用于暂时存储对应key的value值，将由MVCC机制来决定之后该值是否被commit或者被delete（即回滚）&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;CfLock&lt;/code&gt;：用于存储锁，如果某key存在对应key的lock，说明它正在被某个事务修改。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;CfWrite&lt;/code&gt;：用来存储key的每个版本value值的提交时间(commit version)&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;WriteKind&lt;/code&gt;：Lock和Write都有一个write kind属性来记录本次对key进行了什么样的修改。有三种，分别是Put、Delete和Rollback。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;我们依据论文，使用&lt;code&gt;Badger&lt;/code&gt;提供的读写api来完成 &lt;code&gt;transaction.go&lt;/code&gt; 中的&lt;code&gt;MvccTxn&lt;/code&gt;和它的方法。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-golang&#34; data-lang=&#34;golang&#34;&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;// MvccTxn groups together writes as part of a single transaction. It also provides an abstraction over low-level
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;// storage, lowering the concepts of timestamps, writes, and locks into plain keys and values.
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; MvccTxn &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	StartTS &lt;span style=&#34;color:#8be9fd&#34;&gt;uint64&lt;/span&gt;
+	Reader  storage.StorageReader
+	writes  []storage.Modify
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;MvccTxn struct中需要包含事务开始的timestamp &lt;code&gt;StartTS&lt;/code&gt;，底层存储的&lt;code&gt;Reader&lt;/code&gt;和用来将一系列写操作原子化的&lt;code&gt;writes&lt;/code&gt;数组。&lt;/p&gt;
+&lt;p&gt;这里需要注意一下&lt;code&gt;CfDefault&lt;/code&gt;、&lt;code&gt;CfLock&lt;/code&gt;、&lt;code&gt;CfWrite&lt;/code&gt;这三个&lt;code&gt;column family&lt;/code&gt;的key/value编码方式。&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:center&#34;&gt;&lt;/th&gt;
+&lt;th style=&#34;text-align:center&#34;&gt;&lt;code&gt;key&lt;/code&gt;&lt;/th&gt;
+&lt;th style=&#34;text-align:center&#34;&gt;&lt;code&gt;value&lt;/code&gt;&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center&#34;&gt;&lt;code&gt;CfDefault&lt;/code&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:center&#34;&gt;(key, StartTS)&lt;/td&gt;
+&lt;td style=&#34;text-align:center&#34;&gt;value&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center&#34;&gt;&lt;code&gt;CfLock&lt;/code&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:center&#34;&gt;key&lt;/td&gt;
+&lt;td style=&#34;text-align:center&#34;&gt;lock&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:center&#34;&gt;&lt;code&gt;CfWrite&lt;/code&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:center&#34;&gt;(key, commitTS)&lt;/td&gt;
+&lt;td style=&#34;text-align:center&#34;&gt;write&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;写、删除只需构建一个&lt;code&gt;storage.Modify&lt;/code&gt;结构添加到&lt;code&gt;MvccTxn&lt;/code&gt;的&lt;code&gt;writes&lt;/code&gt;中即可。读操作的实现稍微复杂。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;GetValue&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;GetValue finds the value for key, valid at the start timestamp of this transaction.
+I.e., the most recent value committed before the start of this transaction.&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;根据注释，这个方法要求我们读出在事务开始之前最晚写入的值。在论文中提到：一个值只有被commit后才对其他事务可见，表现为一个write记录。很容易想到应该去读 &lt;code&gt;CfWrite&lt;/code&gt; 这个CF。又根据方法EncodeKey的编码规则，key按照userkey升序，userkey相同时按照timestamp降序，我们可以适当编码key并调用seek，使迭代器指向 &lt;code&gt;CfWrite&lt;/code&gt; 这个CF中事务开始之前最晚写入的值。此后还需要注意两点：得到的write的key可能不等于userkey，需要特判；判断write的类型可能为&lt;code&gt;WriteKindDelete&lt;/code&gt;，这表示这个userkey已经被删除，应该返回nil。最后根据write中的StartTS从&lt;code&gt;CfDefault&lt;/code&gt;中读取value。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;CurrentWrite&lt;/p&gt;
+&lt;p&gt;我们需要搜索：对于key，startTS和事务的开始时间相同的write。&lt;/p&gt;
+&lt;p&gt;我们可以直接遍历 &lt;code&gt;CfWrite&lt;/code&gt; 这个CF从中找到符合条件的write。从中找到由于userkey相同时key的编码按timestamp降序，我们在调用EncodeKey时将timestamp设置为&lt;code&gt;^uint64(0)&lt;/code&gt;，之后即可遍历对于userkey的所有write。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;MostRecentWrite&lt;/p&gt;
+&lt;p&gt;我们需要找到对于给定的userkey最迟的write。使用和&lt;code&gt;CurrentWrite&lt;/code&gt;中相似的编码方式，在 &lt;code&gt;CfWrite&lt;/code&gt; 中查找即可。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id=&#34;part-bc-transactional-api&#34;&gt;Part B&amp;amp;C: transactional API&lt;/h2&gt;
+&lt;p&gt;在Part B中我们需要实现&lt;code&gt;KvGet&lt;/code&gt;, &lt;code&gt;KvPrewrite&lt;/code&gt;, 和&lt;code&gt;KvCommit&lt;/code&gt;三个request handler。&lt;/p&gt;
+&lt;h3 id=&#34;kvget&#34;&gt;KvGet&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;KvGet&lt;/code&gt; 根据事务的StartTS读出key对应的value，应当判断该key在读事务的StartTS处是否被其他事务上锁，即查找key是否存在锁且锁的startTS是否早于事务的startTS。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;	txn &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; mvcc.&lt;span style=&#34;color:#50fa7b&#34;&gt;NewMvccTxn&lt;/span&gt;(reader, req.&lt;span style=&#34;color:#50fa7b&#34;&gt;GetVersion&lt;/span&gt;())
+	lock, err &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; txn.&lt;span style=&#34;color:#50fa7b&#34;&gt;GetLock&lt;/span&gt;(key)
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; err &lt;span style=&#34;color:#ff79c6&#34;&gt;!=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;nil&lt;/span&gt; {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;nil&lt;/span&gt;, err
+	}
+
+	&lt;span style=&#34;color:#6272a4&#34;&gt;// lock&amp;#39;s ts &amp;lt;= txn&amp;#39; ts means the key are locked before txn start and not commited yet
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; lock &lt;span style=&#34;color:#ff79c6&#34;&gt;!=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;nil&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; lock.Ts &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;=&lt;/span&gt; txn.StartTS {
+		resp.Error = &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;kvrpcpb.KeyError{
+			Locked: &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;kvrpcpb.LockInfo{
+				PrimaryLock: lock.Primary,
+				LockVersion: lock.Ts,
+				Key:         key,
+				LockTtl:     lock.Ttl,
+			},
+		}
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; resp, &lt;span style=&#34;color:#ff79c6&#34;&gt;nil&lt;/span&gt;
+	}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;若key未被上锁，调用 &lt;code&gt;GetValue&lt;/code&gt; 读取。&lt;/p&gt;
+&lt;h3 id=&#34;kvprewrite&#34;&gt;KvPrewrite&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;KvPrewrite&lt;/code&gt; 先检查每一个key是否可以被写入，并对每一个key上一个指向primary key的锁 。 &lt;code&gt;KvCommit&lt;/code&gt; 检查所有锁是否仍有效并commit所有key。它们共同构成了 &lt;code&gt;Percolator&lt;/code&gt; 事务的两阶段提交。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;KvPrewrite&lt;/code&gt; 需要将value写入每个key的data列，并对该key上锁以防止其他事务的写冲突（即分别写入 &lt;code&gt;CfDefault&lt;/code&gt; 和 &lt;code&gt;CfLock&lt;/code&gt;）。在此之前需要判断没有其他事务也对相同的key上锁或写入。我们应循环检查每一个key是否可以被合法的prewirte。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;首先应该判断是否有其他事务在本事务开始之后提交了相同key的commit，若有则需要记录该冲突并检查下一个key。这里可以调用 &lt;code&gt;MostRecentWrite&lt;/code&gt; 来找到对于key最近的commit记录，再判断是否冲突（冲突即commitTs &amp;gt; 事务的version）。&lt;/li&gt;
+&lt;li&gt;检查key是否在事务开始之前被加锁。&lt;/li&gt;
+&lt;li&gt;在本地事务中写入value、lock。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;循环结束后应判断是否出现冲突，若出现冲突则直接abort本次事务，防止写-写冲突。若没有冲突，调用&lt;code&gt;storage.Write&lt;/code&gt;提交对于&lt;code&gt;CfDefaule&lt;/code&gt;和&lt;code&gt;CfLock&lt;/code&gt;的写入。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;KvCommit&lt;/code&gt; 需要先检查所有的锁的状态。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;若锁不存在，表明可能原事务rollback或锁过期，则本次commit失败。&lt;/li&gt;
+&lt;li&gt;若锁存在，但startTS不等于本次commit请求的startVersion，表明该锁不属于我们期望commit的原事务，而是被其他事务加的锁，本次commit失败。此时需要在resp.Error中的retryable字段处记录，让client重试。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;若锁状态符合要求，删除锁并写入write以提交commit。这两个操作需要加锁latch来保证原子性。&lt;/p&gt;
+&lt;h3 id=&#34;kvscan&#34;&gt;KvScan&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;KvScan&lt;/code&gt; 一次读取 &lt;code&gt;multiple key/value pairs&lt;/code&gt;。&lt;/p&gt;
+&lt;p&gt;badger自带的迭代器只支持在指定的CF中按key顺序迭代，而事务要求我们只能读取在startTS之前提交的value，这需要我们对于每一个key先找到符合条件的write记录，再去&lt;code&gt;CfDefault&lt;/code&gt;列中获取对应的value。&lt;/p&gt;
+&lt;p&gt;下面我们实现一个支持事务的迭代器。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;// NewScanner creates a new scanner ready to read from the snapshot in txn.
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;NewScanner&lt;/span&gt;(startKey []&lt;span style=&#34;color:#8be9fd&#34;&gt;byte&lt;/span&gt;, txn &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;MvccTxn) &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Scanner {
+	&lt;span style=&#34;color:#6272a4&#34;&gt;// Your Code Here (4C).
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	scan &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; Scanner{
+		txn:     txn,
+		iter:    txn.Reader.&lt;span style=&#34;color:#50fa7b&#34;&gt;IterCF&lt;/span&gt;(engine_util.CfWrite),
+		lastKey: []&lt;span style=&#34;color:#8be9fd&#34;&gt;byte&lt;/span&gt;{},
+	}
+
+	scan.iter.&lt;span style=&#34;color:#50fa7b&#34;&gt;Seek&lt;/span&gt;(&lt;span style=&#34;color:#50fa7b&#34;&gt;EncodeKey&lt;/span&gt;(startKey, txn.StartTS))
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;scan
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;它包含一个&lt;code&gt;CfWrite&lt;/code&gt;列的迭代器。以及一个 &lt;code&gt;lastKey&lt;/code&gt; 字段，它记录找到的上一个符合条件的write所对应的Key。&lt;/p&gt;
+&lt;p&gt;最核心的是&lt;code&gt;Scanner.Next&lt;/code&gt;函数，它返回下一个符合事务条件的key/value。&lt;/p&gt;
+&lt;p&gt;首先移动迭代器，使其指向第一个满足 key != lastKey 的write记录。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;    &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;var&lt;/span&gt; currentUserKey []&lt;span style=&#34;color:#8be9fd&#34;&gt;byte&lt;/span&gt;
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; scan.iter.&lt;span style=&#34;color:#50fa7b&#34;&gt;Valid&lt;/span&gt;() {
+		currentUserKey = &lt;span style=&#34;color:#50fa7b&#34;&gt;DecodeUserKey&lt;/span&gt;(scan.iter.&lt;span style=&#34;color:#50fa7b&#34;&gt;Item&lt;/span&gt;().&lt;span style=&#34;color:#50fa7b&#34;&gt;KeyCopy&lt;/span&gt;(&lt;span style=&#34;color:#ff79c6&#34;&gt;nil&lt;/span&gt;))
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; !bytes.&lt;span style=&#34;color:#50fa7b&#34;&gt;Equal&lt;/span&gt;(currentUserKey, scan.lastKey) {
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;break&lt;/span&gt;
+		}
+
+		scan.iter.&lt;span style=&#34;color:#50fa7b&#34;&gt;Next&lt;/span&gt;()
+	}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;循环使用seek寻找 &lt;code&gt;EncodeKey(currentUserKey, scan.txn.StartTS)&lt;/code&gt; 或之后的第一个 key。需要注意在 &lt;code&gt;currentUserKey&lt;/code&gt; 处可能没有在 &lt;code&gt;txn.StartTS&lt;/code&gt; 之前的commit，这会使迭代器指向下一个userKey最早的commit。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;	&lt;span style=&#34;color:#6272a4&#34;&gt;// now we find a key that userKey != lastKey, seek commitTs &amp;lt; startTs
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; currentCommitTs &amp;gt; scan.txn.StartTS {
+		scan.iter.&lt;span style=&#34;color:#50fa7b&#34;&gt;Seek&lt;/span&gt;(&lt;span style=&#34;color:#50fa7b&#34;&gt;EncodeKey&lt;/span&gt;(currentUserKey, scan.txn.StartTS))
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; !scan.iter.&lt;span style=&#34;color:#50fa7b&#34;&gt;Valid&lt;/span&gt;() {
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;nil&lt;/span&gt;, &lt;span style=&#34;color:#ff79c6&#34;&gt;nil&lt;/span&gt;, &lt;span style=&#34;color:#ff79c6&#34;&gt;nil&lt;/span&gt;
+		}
+
+		currentUserKey = &lt;span style=&#34;color:#50fa7b&#34;&gt;DecodeUserKey&lt;/span&gt;(scan.iter.&lt;span style=&#34;color:#50fa7b&#34;&gt;Item&lt;/span&gt;().&lt;span style=&#34;color:#50fa7b&#34;&gt;KeyCopy&lt;/span&gt;(&lt;span style=&#34;color:#ff79c6&#34;&gt;nil&lt;/span&gt;))
+		currentCommitTs = &lt;span style=&#34;color:#50fa7b&#34;&gt;decodeTimestamp&lt;/span&gt;(scan.iter.&lt;span style=&#34;color:#50fa7b&#34;&gt;Item&lt;/span&gt;().&lt;span style=&#34;color:#50fa7b&#34;&gt;KeyCopy&lt;/span&gt;(&lt;span style=&#34;color:#ff79c6&#34;&gt;nil&lt;/span&gt;))
+	}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;这样我们便找到了下一个commitTS符合要求的userkey，只需去 &lt;code&gt;CfDefault&lt;/code&gt; 中读取value即可。&lt;/p&gt;
+&lt;p&gt;此后我们可以简单的实现 &lt;code&gt;KvScan&lt;/code&gt; ，只需根据startKey和limit建立事务迭代器实例，并循环调用&lt;code&gt;Next&lt;/code&gt;获取key / value对。&lt;/p&gt;
+&lt;h3 id=&#34;kvchecktxnstatus&#34;&gt;KvCheckTxnStatus&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;KvCheckTxnStatus&lt;/code&gt; 报告事务的状态，并回滚过期的锁。&lt;/p&gt;
+&lt;p&gt;需要注意 &lt;code&gt;CheckTxnStatusResponse&lt;/code&gt; 中给出的注释。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;    &lt;span style=&#34;color:#6272a4&#34;&gt;// Three kinds of txn status:
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;    &lt;span style=&#34;color:#6272a4&#34;&gt;// locked: lock_ttl &amp;gt; 0
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;    &lt;span style=&#34;color:#6272a4&#34;&gt;// committed: commit_version &amp;gt; 0
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;    &lt;span style=&#34;color:#6272a4&#34;&gt;// rolled back: lock_ttl == 0 &amp;amp;&amp;amp; commit_version == 0
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;为了确认事务是否以及被回滚或提交，应当先查找 (primary key, lockTS) 对应的write记录，这里可以使用 &lt;code&gt;CurrentWrite&lt;/code&gt; 函数，这要求我们使用req.lockTS来初始化本次事务。若存在write记录，设置 &lt;code&gt;resp.Action = kvrpcpb.Action_NoAction&lt;/code&gt;。还需要判断write的类型，若类型为 &lt;code&gt;WriteKindRollback&lt;/code&gt; 则需要在resp中的 &lt;code&gt;CommitVersion&lt;/code&gt; 记录write
+的commitTS。&lt;/p&gt;
+&lt;p&gt;之后需要确认锁的状态。若锁不存在，则需要回滚primary key，并记录 &lt;code&gt;resp.Action = kvrpcpb.Action_LockNotExistRollback&lt;/code&gt;。若锁存在，判断ttl是否过期。若过期则删除锁和value并回滚，并记录 &lt;code&gt;resp.Action = kvrpcpb.Action_TTLExpireRollback&lt;/code&gt;。这里判断ttl需要使用 &lt;code&gt;physical time&lt;/code&gt;。&lt;/p&gt;
+&lt;p&gt;若锁仍有效，在 &lt;code&gt;resp.LockTtl&lt;/code&gt; 字段中记录剩余ttl并返回。&lt;/p&gt;
+&lt;h3 id=&#34;kvbatchrollback&#34;&gt;KvBatchRollback&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;KvBatchRollback&lt;/code&gt; 批量回滚事务。检查每个key是否仍被原事务上锁，如果是则删除锁和value，回滚该事务。&lt;/p&gt;
+&lt;p&gt;循环检查每一个key&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;检查该key是否已经被回滚或提交。若已被回滚则忽略该key，若已被commit则在&lt;code&gt;resp.Error.Abort&lt;/code&gt; 中记录错误信息并直接返回。可以调用 &lt;code&gt;MostRecentWrite&lt;/code&gt; 来获取最近提交的write。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;检查该key是否存在锁。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;若不存在，直接回滚该key。&lt;/li&gt;
+&lt;li&gt;若存在。
+&lt;ul&gt;
+&lt;li&gt;锁不属于原事务，视为出错，回滚该事务。&lt;/li&gt;
+&lt;li&gt;锁仍属于原事务，执行所有回滚步骤，删除锁、value，再回滚。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;若循环过程中发生出错则不将txn中的writes写入storage，即一个key出错视为全部出错。&lt;/p&gt;
+&lt;h3 id=&#34;kvresolvelock&#34;&gt;KvResolveLock&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;KvResolveLock&lt;/code&gt; 将查找属于具有给定开始时间戳的事务的所有锁，要么将他们全部回滚，要么全部commit。&lt;/p&gt;
+&lt;p&gt;首先要根据startVersion找到所有的lock，我们遍历&lt;code&gt;CfLock&lt;/code&gt;找到所有满足 &lt;code&gt;lock.Ts == req.StartVersion&lt;/code&gt; 的lock。之后根据 &lt;code&gt;req.CommitVersion&lt;/code&gt; 是否为零决定回滚或是commit，相应操作可以直接调用 &lt;code&gt;KvBatchRollback&lt;/code&gt; 或者 &lt;code&gt;KvCommit&lt;/code&gt; 。&lt;/p&gt;
+</description>
+        </item>
+        <item>
+        <title>TinyKV Project3: MultiRaftKV</title>
+        <link>https://ziannchen.work/2022/tinykv-project3-multiraftkv/</link>
+        <pubDate>Sat, 05 Feb 2022 21:19:15 +0800</pubDate>
+        
+        <guid>https://ziannchen.work/2022/tinykv-project3-multiraftkv/</guid>
+        <description>&lt;p&gt;在本项目中我们需要实现基于多个raft集群的KV服务器，其中的每一个raft集群只负责固定范围内的关键字，从而解决raft算法为了追求一致性而影响了并发性的问题。&lt;/p&gt;
+&lt;p&gt;为了支持这样的设计，我们需要完成三个部分的内容：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;为我们的raft算法添加集群成员变更以及领导权变更的功能。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;在raftstore中实现配置变更以及region分裂。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;实现一个调度算法用于合理地变化配置，获得更好的服务器调度性能。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2 id=&#34;part-a实现集群成员变更以及领导权变更&#34;&gt;Part A：实现集群成员变更以及领导权变更&lt;/h2&gt;
+&lt;h3 id=&#34;领导权变更&#34;&gt;领导权变更&lt;/h3&gt;
+&lt;p&gt;在这个部分我们需要引入两个新的消息类型。&lt;code&gt;MsgTransferLeader&lt;/code&gt;使得目前的leader检查其继任者的状态，&lt;code&gt;MsgTimeoutNow&lt;/code&gt;驱动继任者无视其&lt;code&gt;ElectionTimeOut&lt;/code&gt;立即发动选举。在leader帮助其更新日志并且其他follower的时钟都为随机设定的条件下，它有相当高的几率成为新的leader，而这也正是我们所期望的。&lt;/p&gt;
+&lt;p&gt;在&lt;code&gt;handleTransforLeader&lt;/code&gt;函数中定义了leader面对领导权变更时的行为。对于&lt;code&gt;MsgTransferLeader&lt;/code&gt;，它的&lt;code&gt;from&lt;/code&gt;成员应当是上层设定的&lt;code&gt;transferee&lt;/code&gt;。因此应当排除三种错误情况：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;和一般的local message一样，&lt;code&gt;from&lt;/code&gt;成员等于自身id的情况。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;leader的&lt;code&gt;transferee&lt;/code&gt;已经设定并且等于&lt;code&gt;from&lt;/code&gt;的情况(说明有已经在运行的领导权变更，无需重复执行)。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;将要确定的transferee不在leader记录的peer中的情况。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;在排除以上三种情况之后，我们需要检查&lt;code&gt;transferee&lt;/code&gt;的&lt;code&gt;log&lt;/code&gt;是否是最新的，这样才能不与正常的选举规则冲突。若不是，则应调用&lt;code&gt;sendAppend&lt;/code&gt;函数向它发送缺少的entry。在transferee的记录已经最新的情况下，leader应当调用&lt;code&gt;sendTimeoutNow&lt;/code&gt;函数向其发送&lt;code&gt;MsgTimeoutNow&lt;/code&gt;消息使其立刻发动新的选举。&lt;/p&gt;
+&lt;p&gt;收到&lt;code&gt;MsgTransferLeader&lt;/code&gt;消息时，follower将其转发给leader。follower收到&lt;code&gt;MsgTimeoutNow&lt;/code&gt;之后调用&lt;code&gt;step&lt;/code&gt;函数，参数为&lt;code&gt;MsgHup&lt;/code&gt;类型的消息。follower接着就会立即将计时器置零并发动选举。&lt;/p&gt;
+&lt;h3 id=&#34;配置变更&#34;&gt;配置变更&lt;/h3&gt;
+&lt;p&gt;与论文中相同的是，为了支持配置变更，我们需要一个特殊的entry来记录配置的参数。因此需要在&lt;code&gt;raft/rawnode.go&lt;/code&gt;中加入&lt;code&gt;ProposeConfChange&lt;/code&gt;函数，它将entry的类型设置为&lt;code&gt;EntryConfChange&lt;/code&gt;并将数据设置为&lt;code&gt;ConfChange&lt;/code&gt;的相应字节，最后向raft层发送一个带有这样的entry，并且类型为&lt;code&gt;MsgPropose&lt;/code&gt;的消息。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;MsgPropose&lt;/code&gt;类型的消息只会被leader受理，它将其加入自己的log之中并且尝试向follwer发送并提交消息中的entry，这与我们在项目2中所做的并没有什么区别，只需要在&lt;code&gt;raft.go&lt;/code&gt;中的&lt;code&gt;handlePropose&lt;/code&gt;函数内加入设置&lt;code&gt;PendingConfIndex&lt;/code&gt;的代码，将它设置为第一个配置变更的entry的index并暂时不受理其他的配置变更。&lt;/p&gt;
+&lt;p&gt;对于Part A，我们只需要在&lt;code&gt;rawnode.go&lt;/code&gt;中加入&lt;code&gt;ApplyConfChange&lt;/code&gt;函数，用于处理一个节点的参数变化。为了实现这个功能，我们在raft层中加入了&lt;code&gt;addNode&lt;/code&gt;与&lt;code&gt;removeNode&lt;/code&gt;函数，它们都具有相当直观的实现。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;AddNode&lt;/code&gt;函数在raft的peers中添加相应的peer，并且初始化它的&lt;code&gt;Progress&lt;/code&gt;，最后将raft的&lt;code&gt;PendingConfIndex&lt;/code&gt;清空，使其能够处理下一个配置变更的消息。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;removeNode&lt;/code&gt;函数则较为复杂一些：&lt;/p&gt;
+&lt;p&gt;(1) 首先检查需要删除的raft是否在当前配置之中，若不在则直接返回，若在则转(2)。&lt;/p&gt;
+&lt;p&gt;(2) 检查自身是否为需要删除的peer，若是则清空自己的peers并且返回。若不是则转(3)。&lt;/p&gt;
+&lt;p&gt;(3) 删除相应的peer，并检查自己的peer数量。若为1，则它需要成为这个集群的leader。&lt;/p&gt;
+&lt;p&gt;(4) 删除peer后，原先不满足commit条件的entry有可能已经满足，调用&lt;code&gt;maybeAdvanceCommit&lt;/code&gt;函数进行提交。&lt;/p&gt;
+&lt;p&gt;(5) 最后清空&lt;code&gt;PendingConfIndex&lt;/code&gt;。&lt;/p&gt;
+&lt;h2 id=&#34;part-b-在raftstore中实现配置变更以及region分裂&#34;&gt;Part B: 在raftstore中实现配置变更以及region分裂&lt;/h2&gt;
+&lt;h3 id=&#34;propose-transfer-leader&#34;&gt;Propose transfer leader&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;TransferLeader&lt;/code&gt;直接被发送给集群中的leader，不需要被复制到多个peer上，因此不需要记录在proposal中，直接调用&lt;code&gt;RawNode.TransferLeader&lt;/code&gt;。&lt;/p&gt;
+&lt;h3 id=&#34;implement-conf-change-in-raftstore&#34;&gt;Implement conf change in raftstore&lt;/h3&gt;
+&lt;p&gt;在raft层需要在&lt;code&gt;PendingConfIndex&lt;/code&gt;字段中记录类型为&lt;code&gt;EntryType_EntryConfChange&lt;/code&gt;的日志项的index，当配置变更被apply后落实到raft层后清空这个字段。在propose的时候，如果这个字段不为None则直接返回，表示还有一次配置变更没有完成。之后调用&lt;code&gt;RawNode.ProposeConfChange&lt;/code&gt;。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;HandleRaftReady&lt;/code&gt;中由于存在配置变更的情况，在应用了Ready中的快照后region可能发生改变，。因此在&lt;code&gt;SaveReadyState&lt;/code&gt;之后需要修改d.ctx.storeMeta。&lt;/p&gt;
+&lt;p&gt;处理CommittedEntries的部分代码也需要重构以特殊处理&lt;code&gt;EntryType_EntryConfChange&lt;/code&gt;类型的日志项。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;len&lt;/span&gt;(rd.CommittedEntries) &amp;gt; &lt;span style=&#34;color:#bd93f9&#34;&gt;0&lt;/span&gt; {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; _, e &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;range&lt;/span&gt; rd.CommittedEntries {
+			kvwb &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;new&lt;/span&gt;(engine_util.WriteBatch)
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;switch&lt;/span&gt; e.EntryType {
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; eraftpb.EntryType_EntryNormal:
+				d.&lt;span style=&#34;color:#50fa7b&#34;&gt;processNormalEntry&lt;/span&gt;(e, kvwb)
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;case&lt;/span&gt; eraftpb.EntryType_EntryConfChange:
+				d.&lt;span style=&#34;color:#50fa7b&#34;&gt;processConfChangeEntry&lt;/span&gt;(e, kvwb)
+			}
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; d.stopped {
+				&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt;
+			} &lt;span style=&#34;color:#ff79c6&#34;&gt;else&lt;/span&gt; {
+				d.peerStorage.applyState.AppliedIndex = e.Index
+				log.&lt;span style=&#34;color:#50fa7b&#34;&gt;Infof&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;%s successfully apply entry from raft peer %d [index: %d]&amp;#34;&lt;/span&gt;, d.Tag, d.&lt;span style=&#34;color:#50fa7b&#34;&gt;PeerId&lt;/span&gt;(), e.Index)
+				kvwb.&lt;span style=&#34;color:#50fa7b&#34;&gt;SetMeta&lt;/span&gt;(meta.&lt;span style=&#34;color:#50fa7b&#34;&gt;ApplyStateKey&lt;/span&gt;(d.regionId), d.peerStorage.applyState)
+			}
+			kvwb.&lt;span style=&#34;color:#50fa7b&#34;&gt;WriteToDB&lt;/span&gt;(d.peerStorage.Engines.Kv)
+
+		}
+	}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;在添加或是删除node时，都需要先判断目标node是否已存在当前的region的peers中。配置变更之后，还需要增加&lt;code&gt;region.RegionEpoch.ConfVer&lt;/code&gt;，修改peerCache。如果删除了自己，需要调用&lt;code&gt;destroyPeer&lt;/code&gt;并直接返回，此后的日志项也不需要再处理。 新建的peer无需我们关心，他会在收到leader的心跳后被初始化，之后接收快照来达到接近region内其他peer的状态。&lt;/p&gt;
+&lt;h3 id=&#34;implement-split-region-in-raftstore&#34;&gt;Implement split region in raftstore&lt;/h3&gt;
+&lt;p&gt;为了支持multi-raft，TinyKV对于较大的region进行分裂，有助于均衡集群内各个机器的负载。&lt;/p&gt;
+&lt;p&gt;在propose的时候需要检查SplitKey是否合法，不合法则直接返回。&lt;/p&gt;
+&lt;p&gt;region分裂需要将region中的每一个peer都分裂为两个。split消息会被复制到region中的所有peer上，并由每一个peer在apply时将自己分裂，这样就完成了分裂，而且他们共用同一个store。&lt;/p&gt;
+&lt;p&gt;Split属于AdminRequest，在处理的时候需要先依次检查RegionId、RegionEpoch、SplitKey是否都合法，若检查通过则开始分裂。&lt;/p&gt;
+&lt;p&gt;首先，原先的region从splitkey处分裂为两个，key range分别为[startKey, splitkey)和[splitkey, endkey)。因此需要新建一个region，其中RegionEpoch中的ConfVer和Version都设为1，在原先的region中增加RegionEpoch.Version。&lt;/p&gt;
+&lt;p&gt;然后需要修改d.ctx.storeMeta，删除旧的region信息，记录两个新的region信息。调用&lt;code&gt;WriteRegionState&lt;/code&gt;持久化两个新的region，state要设置为PeerState_Normal。&lt;/p&gt;
+&lt;p&gt;最后，调用createPeer新建一个peer，并在route中注册，向其发生一个MsgTypeStart信息。不要忘了处理proposal。&lt;/p&gt;
+&lt;h2 id=&#34;part-c实现调度器&#34;&gt;Part C：实现调度器&lt;/h2&gt;
+&lt;p&gt;调度器根据集群的负载选择每个region中每个副本的最佳位置，因此需要获取整个集群的所有关键信息，并定期检查这些信息以做出调度。&lt;/p&gt;
+&lt;h3 id=&#34;collect-region-heartbeat&#34;&gt;Collect region heartbeat&lt;/h3&gt;
+&lt;p&gt;调度器要求每个region中的leader定期向它发送心跳信息。&lt;/p&gt;
+&lt;p&gt;我们需要实现&lt;code&gt;RaftCluster.processRegionHeartbeat&lt;/code&gt;函数，更新本地保存的region信息。&lt;/p&gt;
+&lt;p&gt;在此之前我们先实现一个&lt;code&gt;checkRegionEpoch&lt;/code&gt;来判断新的region信息是否合法且是否过期。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;checkRegionEpoch&lt;/span&gt;(region &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;core.RegionInfo, origin &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;core.RegionInfo) &lt;span style=&#34;color:#8be9fd&#34;&gt;error&lt;/span&gt; {
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; region.&lt;span style=&#34;color:#50fa7b&#34;&gt;GetRegionEpoch&lt;/span&gt;() &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;nil&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;||&lt;/span&gt; origin.&lt;span style=&#34;color:#50fa7b&#34;&gt;GetRegionEpoch&lt;/span&gt;() &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;nil&lt;/span&gt; {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; errors.&lt;span style=&#34;color:#50fa7b&#34;&gt;Errorf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;region is nil&amp;#34;&lt;/span&gt;)
+	}
+
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; util.&lt;span style=&#34;color:#50fa7b&#34;&gt;IsEpochStale&lt;/span&gt;(region.&lt;span style=&#34;color:#50fa7b&#34;&gt;GetRegionEpoch&lt;/span&gt;(), origin.&lt;span style=&#34;color:#50fa7b&#34;&gt;GetRegionEpoch&lt;/span&gt;()) {
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;ErrRegionIsStale&lt;/span&gt;(region.&lt;span style=&#34;color:#50fa7b&#34;&gt;GetMeta&lt;/span&gt;(), origin.&lt;span style=&#34;color:#50fa7b&#34;&gt;GetMeta&lt;/span&gt;())
+	}
+
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;nil&lt;/span&gt;
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;我们先需要根据心跳中的regionInfo的regionId先获取本地保存的region信息。若本地存在且新的region过期，直接返回错误。若不存在，遍历本地所有包含了新region的key range的region信息，检查新的region对于它是否过期，若存在过期则直接返回错误。&lt;/p&gt;
+&lt;p&gt;若新的region未过期，则更新本地存储，包括了region tree和store status。&lt;/p&gt;
+&lt;h3 id=&#34;implement-region-balance-scheduler&#34;&gt;Implement region balance scheduler&lt;/h3&gt;
+&lt;p&gt;这一部分需要实现&lt;code&gt;balanceRegionScheduler.Schedule&lt;/code&gt;函数，它负责进行region的调度，返回一个MovePeerOperator，将某个peer在store之间移动。&lt;/p&gt;
+&lt;p&gt;首先寻找合适的可移动的region，在此之前需要寻找所有合适的store，即：正在运行并且 downTime 小于 store的最大downTime 的所有store。如果suitableStores数量小等于1，不能进行MovePeer，则停止本次调度返回nil。之后将所有suitableStores按照拥有的region大小从大到小排序。&lt;/p&gt;
+&lt;p&gt;接着我们遍历suitableStores，在每个store上按照PendingRegionsWithLock -&amp;gt; FollowerWithLock -&amp;gt; LeadersWIthLock的优先级选出第一个满足条件的region，这便是我们想要移动的region。如果没有找到合适的region，或是该region的副本数小于MaxReplicas，则停止本次调度返回nil。&lt;/p&gt;
+&lt;p&gt;最后我们寻找接收peer的目标store，即拥有的region大小最小且不在suitableStores中的store。如果sourceStore.GetRegionSize()-targetStore.GetRegionSize() &amp;lt;= region.GetApproximateSize()*2，则本次调度不能进行。之后调用&lt;code&gt;AllocPeer&lt;/code&gt;在targetStore上新建一个peer，调用&lt;code&gt;CreateMovePeerOperator&lt;/code&gt;生成operator返回。&lt;/p&gt;
+</description>
+        </item>
+        <item>
+        <title>TinyKV Project2: RaftKV</title>
+        <link>https://ziannchen.work/2022/tinykv-project2-raftkv/</link>
+        <pubDate>Sat, 05 Feb 2022 21:13:40 +0800</pubDate>
+        
+        <guid>https://ziannchen.work/2022/tinykv-project2-raftkv/</guid>
+        <description>&lt;p&gt;在本项目中我们需要实现一个基于 raft 分布式共识算法的高可用kv存储服务器，它既需要我们实现Raft算法也需要我们知道如何实际使用它。&lt;/p&gt;
+&lt;p&gt;我们通过3个步骤来达成这一目标：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;实现基本的Raft算法。&lt;/li&gt;
+&lt;li&gt;在Raft之上构建一个可容错的KV服务。&lt;/li&gt;
+&lt;li&gt;添加对于raft日志垃圾回收以及快照的支持。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id=&#34;part-a实现基本的raft算法&#34;&gt;Part A：实现基本的Raft算法&lt;/h2&gt;
+&lt;p&gt;raft层中没有物理时钟，而是使用一个逻辑时钟。上层应用通过调用&lt;code&gt;RawNode.Tick()&lt;/code&gt;来推动逻辑时钟，进而推动election \ heartbeat timeout的发生，从而推动了raft状态机。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;在&lt;code&gt;Raft.tick&lt;/code&gt;函数中，根据&lt;code&gt;Raft.State&lt;/code&gt;推动election timeout或是 heartbeat timeout。这是通过控制&lt;code&gt;electionElapsed&lt;/code&gt;和&lt;code&gt;heartbeatElapsed&lt;/code&gt;进行自增操作实现的，当&lt;code&gt;electionElapsed &amp;gt;= randomizeElectionTimeout&lt;/code&gt;时触发一次选举，当&lt;code&gt;heartbeatElapsed &amp;gt;= heartbeatTimeout&lt;/code&gt;时触发一次心跳。触发之后对应地要清零&lt;code&gt;Elapsed&lt;/code&gt;。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;raft中不同peer之间、raft层与上层应用之间收发消息都是异步的。在raft层中只需将希望发出的消息存入&lt;code&gt;Raft.msg&lt;/code&gt;中，上层应用会在调用&lt;code&gt;HandleRaftReady&lt;/code&gt;处理消息并转发到目标处。上层应用同时为每个收到的消息调用&lt;code&gt;Raft.Step&lt;/code&gt;让raft层处理消息。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;raft中定义的不同&lt;code&gt;Message&lt;/code&gt;有不同的&lt;code&gt;MsgType&lt;/code&gt;。根据论文，不同的&lt;code&gt;MsgType&lt;/code&gt;只能拥有特定的raft状态的peer才能处理，如下表所示。每个消息先在&lt;code&gt;Raft.Step&lt;/code&gt;函数中根据此时raft状态的的不同被路由到对应的不同状态的step函数中处理，再根据消息类型的不同由对应的&lt;code&gt;handlexxx&lt;/code&gt;函数处理。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;&lt;code&gt;Msgtype&lt;/code&gt;&lt;/th&gt;
+&lt;th&gt;&lt;code&gt;State&lt;/code&gt;&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;pb.MessageType_MsgHup&lt;/td&gt;
+&lt;td&gt;L、C、F&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;pb.MessageType_MsgBeat&lt;/td&gt;
+&lt;td&gt;L&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;pb.MessageType_MsgPropose&lt;/td&gt;
+&lt;td&gt;L&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;pb.MessageType_MsgAppend&lt;/td&gt;
+&lt;td&gt;L、C、F&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;pb.MessageType_MsgAppendResponse&lt;/td&gt;
+&lt;td&gt;L&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;pb.MessageType_MsgRequestVote&lt;/td&gt;
+&lt;td&gt;L、C、F&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;pb.MessageType_MsgRequestVoteResponse&lt;/td&gt;
+&lt;td&gt;C&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;pb.MessageType_MsgSnapshot&lt;/td&gt;
+&lt;td&gt;L、C、F&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;pb.MessageType_MsgHeartbeat&lt;/td&gt;
+&lt;td&gt;L、C、F&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;pb.MessageType_MsgHeartbeatResponse&lt;/td&gt;
+&lt;td&gt;L&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;pb.MessageType_MsgTransferLeader&lt;/td&gt;
+&lt;td&gt;L、C、F&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;pb.MessageType_MsgTimeoutNow&lt;/td&gt;
+&lt;td&gt;C、F&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;newRaft函数，根据传入的一个&lt;code&gt;Config&lt;/code&gt;参数创建一个raft peer实例。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;Raft.RaftLog&lt;/code&gt;需要调用&lt;code&gt;newLog&lt;/code&gt;函数，需要注意Raft中的entries和Storage中entries数组下标、日志项index、几个特殊的index之间的关系。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;Raft.Prs&lt;/code&gt;记录了同一个region内各个peer的日志同步情况。 还有一个隐含的作用是记录了同一个region内各个peer的id，也让我们知道了peer的数量，这在有时候很有用。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;leader-election&#34;&gt;Leader election&lt;/h3&gt;
+&lt;p&gt;首先要实现&lt;code&gt;becomexxx&lt;/code&gt;函数。根据论文可以很容易实现&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;becomeFollower&lt;/code&gt;：更新State、Vote、Term、Lead，将electionElapsed清零。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;becomeCandidate&lt;/code&gt;：更新State，将Vote设为自己的id，清空votes、Lead、electionElapsed，设置votes[r.id] = true，增加Term。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;becomeLeader&lt;/code&gt;：更新State、heartbeatElapsed，将Lead设为自己的id，更新Prs，自增一条空日志并广播（每个leader只会commit本term内的日志，如此可以保证集群的可用性）。需要注意的是如果当前Region中只有自己，则直接commit该条日志。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;发起选举的过程是在&lt;code&gt;startElection&lt;/code&gt;中实现。调用becomeCandidate，并向其他peer广播RequestVote消息。在消息中需要附加自身的最后一条日志的Index和term。需要注意的是，若region中只有自己一个节点，则直接成为leader。&lt;/p&gt;
+&lt;p&gt;处理candidate发来的RequestVote消息是在&lt;code&gt;handleRequestVote&lt;/code&gt;函数中实现。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;如果消息中的Term比自身的Term小，拒绝投票。&lt;/li&gt;
+&lt;li&gt;如果&lt;code&gt;r.Vote != None &amp;amp;&amp;amp; r.Vote != m.From&lt;/code&gt;，这意味着在本次任期中已经为另一个peer投过票，拒绝投票。&lt;/li&gt;
+&lt;li&gt;判断消息发送者的日志是否比自己更up-to-date。若不是，拒绝投票。&lt;/li&gt;
+&lt;li&gt;至此，同意投票，更新自身Vote字段。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;处理其他peer回复的RequestVoteResponse是在&lt;code&gt;handleRequestVoteResponse&lt;/code&gt;函数中实现。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;如果消息的Term比自己的Term小，拒绝处理该消息。这意味着这个消息是过时的。&lt;/li&gt;
+&lt;li&gt;如果同意投票，更新r.votes。如果同意投票的数量过半，自己成为leader；如果拒绝投票的数量过半，自己退化为follower。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;成为leader后要定期广播心跳，通过调用&lt;code&gt;boardcastHeartbeat&lt;/code&gt;来进行广播，在消息中附加自己的Term。&lt;/p&gt;
+&lt;h3 id=&#34;log-replication&#34;&gt;Log replication&lt;/h3&gt;
+&lt;p&gt;leader在Prs中记录同一region中各个peer的日志同步情况，在某个peer日志落后时要进行日志复制，在上层应用向raft层Propose日志后也要进行广播日志复制。&lt;/p&gt;
+&lt;p&gt;发送日志复制的操作在&lt;code&gt;sendAppend&lt;/code&gt;中处理。&lt;code&gt;r.Prs[to].Next&lt;/code&gt;代表需要向&lt;code&gt;to&lt;/code&gt;复制的第一条日志的index，如果这条日志已经被compact了，则转为发送snapshot。发送日志时还需要附带前一条日志的index和term以及自己的commit。&lt;/p&gt;
+&lt;p&gt;接收到leader的日志复制消息后，相应的处理在&lt;code&gt;handleAppendEntries&lt;/code&gt;中。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;若消息的term比自身小，这表示原leader可能陷入网络分区之类的情况，不知道外部已经产生了term更大的新的leader，拒绝。&lt;/li&gt;
+&lt;li&gt;至此，至少我们可以承认该leader的合法性，调用becomeFollower。&lt;/li&gt;
+&lt;li&gt;如果 &lt;code&gt;m.Index &amp;gt; r.RaftLog.LastIndex()&lt;/code&gt; 这表示自己没有leader想要复制的日志的前一条日志，拒绝，并设置response消息中的index为自己的lastIndex。&lt;/li&gt;
+&lt;li&gt;如果&lt;code&gt;m.Index&lt;/code&gt;对应的日志的term冲突，则拒绝，同时在response消息中需要附带上自己的日志中该term对应的第一条日志的index。&lt;/li&gt;
+&lt;li&gt;至此，同意复制日志。将消息中与自己冲突的日志全部附加在自身未冲突的日志项之后，更新&lt;code&gt;stabled&lt;/code&gt;和&lt;code&gt;commit&lt;/code&gt;。需要注意避免&lt;code&gt;commit&lt;/code&gt;回退。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;leader接收到其他peer对日志复制的回复后，在&lt;code&gt;handleAppendEntriesResponse&lt;/code&gt;中处理。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;若消息的term比自身的小，说明消息过期，拒绝。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;如果消息类型是拒绝：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;若m.Index为0，直接返回。&lt;/li&gt;
+&lt;li&gt;若m.LogTerm为0，说明该peer的日志落后自己太多。若不为0，说明该peer的日志和自己在prevIndex处冲突。调整r.Prs[m.From].Next，重新发送一次日志复制消息。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;如果消息类型是接受：&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;更新r.Prs，视情况是否更新commit。若commit更新，需要立即广播&lt;code&gt;AppendEntries&lt;/code&gt;。若该peer日志仍落后，需要再次发送日志复制。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;implement-the-raw-node-interface&#34;&gt;Implement the raw node interface&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;RawNode&lt;/code&gt;包装了一个&lt;code&gt;Raft&lt;/code&gt;结构，是与上层应用交互的接口。&lt;code&gt;Campaign&lt;/code&gt;函数让&lt;code&gt;RawNode&lt;/code&gt;在raft层直接发起一次选举。&lt;code&gt;Propose&lt;/code&gt;向raft层中添加一条日志。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;Ready&lt;/code&gt;函数将此刻的&lt;code&gt;RawNode&lt;/code&gt;状态相对于上一次调用&lt;code&gt;Ready&lt;/code&gt;时的增量包装为一个Ready结构返回。其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;Ready.Entries&lt;/code&gt;表示未被持久化的日志项。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;Ready.CommittedEntries&lt;/code&gt;表示已经commit未被apply的日志项。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;Ready.Snapshot&lt;/code&gt;表示&lt;code&gt;pendingSnapshot&lt;/code&gt;，此后需要清空&lt;code&gt;pendingSnapshot&lt;/code&gt;。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;Ready.Messages&lt;/code&gt;表示需要发给其他peer的消息，此后需要清空&lt;code&gt;RawNode.Raft.msgs&lt;/code&gt;。
+由于需要获取增量，所以&lt;code&gt;HardState&lt;/code&gt;和&lt;code&gt;SoftState&lt;/code&gt;需要与上一次获得的进行对比，若不同才能写入&lt;code&gt;Ready&lt;/code&gt;中。因此，&lt;code&gt;RawNode&lt;/code&gt;结构中需要记录&lt;code&gt;prevSoftState&lt;/code&gt;、&lt;code&gt;prevHardState&lt;/code&gt;。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;code&gt;hasReady&lt;/code&gt;用于判断&lt;code&gt;Ready&lt;/code&gt;的增量是否存在。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;Advance&lt;/code&gt;在上层应用处理完&lt;code&gt;Ready&lt;/code&gt;后调用，更新raft层的stable、applied。&lt;/p&gt;
+&lt;h2 id=&#34;part-b构建一个可容错的kv服务&#34;&gt;Part B：构建一个可容错的KV服务&lt;/h2&gt;
+&lt;p&gt;&lt;code&gt;RaftStorage&lt;/code&gt;类似于&lt;code&gt;StandaloneStorage&lt;/code&gt;，它处理用户发送来的请求。&lt;/p&gt;
+&lt;p&gt;它启动一个&lt;code&gt;Raftstore&lt;/code&gt;来驱动raft层，将请求包装为&lt;code&gt;RaftCmdRequest&lt;/code&gt;，通过&lt;code&gt;RaftstoreRouter&lt;/code&gt;发送给region中的leader，同时记录一个callback。raft层在日志复制到半数以上节点后apply，我们从callback中读出response，进行相应处理&lt;/p&gt;
+&lt;h3 id=&#34;implement-peer-storage&#34;&gt;Implement peer storage&lt;/h3&gt;
+&lt;p&gt;我们需要将&lt;code&gt;Ready&lt;/code&gt;中的unstable entries持久化，需要注意几点&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;已经转化为快照的日志对应的index不能重复持久化。&lt;/li&gt;
+&lt;li&gt;已经持久化但过时的日志需要删除。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;在&lt;code&gt;SaveReadyState&lt;/code&gt;中我们要保存&lt;code&gt;Ready&lt;/code&gt;中的状态，保存日志、更新&lt;code&gt;PeerStorage.raftState&lt;/code&gt;，并持久化到raftDB。&lt;/p&gt;
+&lt;h3 id=&#34;implement-raft-ready-process&#34;&gt;Implement Raft ready process&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;Raftstore&lt;/code&gt;会启动一个&lt;code&gt;raftWorker&lt;/code&gt;用于驱动raft层。它在一个循环中不停地接收消息，将一些消息调用&lt;code&gt;RawNode&lt;/code&gt;的接口传递给raft层，并处理&lt;code&gt;RawNode&lt;/code&gt;的Ready。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; _, msg &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;range&lt;/span&gt; msgs {
+		peerState &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; rw.&lt;span style=&#34;color:#50fa7b&#34;&gt;getPeerState&lt;/span&gt;(peerStateMap, msg.RegionID)
+		&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; peerState &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;nil&lt;/span&gt; {
+			&lt;span style=&#34;color:#ff79c6&#34;&gt;continue&lt;/span&gt;
+		}
+		&lt;span style=&#34;color:#50fa7b&#34;&gt;newPeerMsgHandler&lt;/span&gt;(peerState.peer, rw.ctx).&lt;span style=&#34;color:#50fa7b&#34;&gt;HandleMsg&lt;/span&gt;(msg)
+	}
+	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; _, peerState &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;range&lt;/span&gt; peerStateMap {
+		&lt;span style=&#34;color:#50fa7b&#34;&gt;newPeerMsgHandler&lt;/span&gt;(peerState.peer, rw.ctx).&lt;span style=&#34;color:#50fa7b&#34;&gt;HandleRaftReady&lt;/span&gt;()
+    }
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;首先实现&lt;code&gt;proposeRaftCommand&lt;/code&gt;函数。它将&lt;code&gt;RaftCmdRequest&lt;/code&gt;中的每一个&lt;code&gt;Request&lt;/code&gt;与callback绑定，记录在&lt;code&gt;peer.proposals&lt;/code&gt;数组中，并调用&lt;code&gt;RawNode.Propose&lt;/code&gt;函数将请求发送到raft层进行共识。&lt;/p&gt;
+&lt;p&gt;接着，实现&lt;code&gt;HandleRaftReady&lt;/code&gt;函数。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;若该peer已经被destroy，直接返回。&lt;/li&gt;
+&lt;li&gt;若该peer没有pending Ready，直接返回。&lt;/li&gt;
+&lt;li&gt;获取Ready，并调用&lt;code&gt;SaveReadyState&lt;/code&gt;保存状态。如果自身是leader，调用&lt;code&gt;HeartbeatScheduler&lt;/code&gt;向PD发送心跳同步状态。&lt;/li&gt;
+&lt;li&gt;调用&lt;code&gt;Send&lt;/code&gt;发送消息给其他peer，处理Ready中的CommittedEntries，调用Advance。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;在处理CommittedEntries时，对每个日志项使用一个WriteBatch来保证原子性。从entry.Data中Unmarshal出RaftCmdRequest结构，将其中的请求应用到状态机。需要注意的是请求类型为&lt;code&gt;CmdType_Snap&lt;/code&gt;表示一个读事务，需要设置&lt;code&gt;cb.Txn = d.peerStorage.Engines.Kv.NewTransaction(false)&lt;/code&gt;。&lt;/p&gt;
+&lt;p&gt;将结果封装成&lt;code&gt;RaftCmdResponse&lt;/code&gt;，从&lt;code&gt;proposals&lt;/code&gt;中找到对应的callback返回。此后还需要更新&lt;code&gt;peerStorage.applyState.AppliedIndex&lt;/code&gt;，一同加入WriteBatch，最后持久化。&lt;/p&gt;
+&lt;p&gt;寻找对应的callback的过程在&lt;code&gt;peerMsgHandler.handleProposal&lt;/code&gt;中实现。proposal的index和term和该请求在raft层中日志项的index和term是相同的，因此可以直接遍历proposals数组，找到对应的callback。若index相同但term不同说明这个请求可能未完成共识，应该调用&lt;code&gt;NotifyStaleReq&lt;/code&gt;返回错误信息。&lt;/p&gt;
+&lt;h2 id=&#34;part-craft-日志的垃圾回收以及快照&#34;&gt;Part C：raft 日志的垃圾回收以及快照&lt;/h2&gt;
+&lt;p&gt;长时间运行的服务器会保存大量的raft日志，这会消耗大量磁盘空间。而且在许多时候我们只需要记录状态机的最终状态，而不需要保存状态机达到该状态所经历的过程，因此我们需要截断日志，进行日志项的垃圾回收，并通过快照同步到其他节点。&lt;/p&gt;
+&lt;p&gt;我们需要在raft和raftstore两个部分中分别增加对快照的支持。&lt;/p&gt;
+&lt;h3 id=&#34;implement-in-raft&#34;&gt;Implement in Raft&lt;/h3&gt;
+&lt;p&gt;在raft层的日志同步过程中，如果leader发现希望复制给follower的日志项已经被删除，应该转变为发送一个快照，并在此后复制剩余的日志项。&lt;/p&gt;
+&lt;p&gt;首先我们修改&lt;code&gt;Raft.sendAppend&lt;/code&gt;函数，leader调用这个函数以向follower复制日志。如果r.Prs[to].Next &amp;lt;= r.RaftLog.truncatedIndex，转为发送快照。调用&lt;code&gt;r.RaftLog.storage.Snapshot&lt;/code&gt;以获取快照。&lt;/p&gt;
+&lt;p&gt;接下来是&lt;code&gt;Raft.handleSnapshot&lt;/code&gt;函数，follower在接收到leader发送的快照后调用这个函数处理。首先需要判断这个快照是否是最新的，如果&lt;code&gt;meta.Index &amp;lt;= r.RaftLog.committed&lt;/code&gt;表示该快照不是最新，拒绝接收。之后follower接受这个快照，需要将applied、commited、stabled、truncatedIndex都修改为meta.Index，并清空本地的日志，将这个快照保存在RaftLog.pendingSnapshot中。还需要根据Metadate.ConfState.Nodes更新Raft.Prs。&lt;/p&gt;
+&lt;p&gt;pendingSnapshot会在Ready中被保存到raftstore中，需要实现&lt;code&gt;PeerStorage.ApplySnapshot&lt;/code&gt;函数。先调用&lt;code&gt;clearMeta&lt;/code&gt;和&lt;code&gt;clearExtraData&lt;/code&gt;来清空过时的信息，然后更新raftState和applyState这些metadata，将snapState.StateType设置为SnapState_Applying。最后通过regionSched这个channel向region worker发送一个RegionTaskApply，等待其中的Notifier返回。在&lt;code&gt;HandleRaftReady&lt;/code&gt;中需要先apply快照，后apply日志。&lt;/p&gt;
+&lt;h3 id=&#34;implement-in-raftstore&#34;&gt;Implement in raftstore&lt;/h3&gt;
+&lt;p&gt;raftstore会检查是否需要对日志项进行垃圾回收，并propose一个CompactLogRequest。&lt;/p&gt;
+&lt;p&gt;CompactLogRequest在AdminRequest中，我们需要修改&lt;code&gt;peerMsgHandler.proposeRaftCommand&lt;/code&gt;中增加对AdminRequest的处理。这个请求没有callback，因此不需要记录proposal，直接propose到raft层进行共识。&lt;/p&gt;
+&lt;p&gt;经过共识的CompactLogRequest会在Ready中被apply，我们修改&lt;code&gt;HandleRaftReady&lt;/code&gt;，在处理CommittedEntries先判断请求中AdminRequest是否为空，若不为空需要特殊处理。这个分支里目前只需要处理CompactLogRequest，先判断只有在adminReq.CompactLog.CompactIndex &amp;gt; d.peerStorage.applyState.TruncatedState.Index的时候才能compact。如果需要compact，首先更新 TruncatedState ，然后调用ScheduleCompactLog添加一个 raftlog-gc 的任务异步处理。&lt;/p&gt;
+</description>
+        </item>
+        <item>
+        <title>TinyKV Project1: StandaloneKV</title>
+        <link>https://ziannchen.work/2022/tinykv-project1-standalonekv/</link>
+        <pubDate>Sat, 05 Feb 2022 21:04:35 +0800</pubDate>
+        
+        <guid>https://ziannchen.work/2022/tinykv-project1-standalonekv/</guid>
+        <description>&lt;p&gt;在本项目中，我们将在 &lt;code&gt;column family&lt;/code&gt; 的支持下构建一个独立的 key / value 存储gRPC服务。在 &lt;code&gt;kv/main.go&lt;/code&gt; 中我们初始化了一个 &lt;code&gt;gRPC&lt;/code&gt; server，它包含了一个 &lt;code&gt;tintkv.Server&lt;/code&gt; ，提供名为 &lt;code&gt;TinyKV&lt;/code&gt; 的 &lt;code&gt;gRPC&lt;/code&gt; 服务。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;	server &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; server.&lt;span style=&#34;color:#50fa7b&#34;&gt;NewServer&lt;/span&gt;(storage)
+
+   &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;var&lt;/span&gt; alivePolicy = keepalive.EnforcementPolicy{
+   	MinTime:             &lt;span style=&#34;color:#bd93f9&#34;&gt;2&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt; time.Second, &lt;span style=&#34;color:#6272a4&#34;&gt;// If a client pings more than once every 2 seconds, terminate the connection
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;   	PermitWithoutStream: &lt;span style=&#34;color:#ff79c6&#34;&gt;true&lt;/span&gt;,            &lt;span style=&#34;color:#6272a4&#34;&gt;// Allow pings even when there are no active streams
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;   }
+
+   grpcServer &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; grpc.&lt;span style=&#34;color:#50fa7b&#34;&gt;NewServer&lt;/span&gt;(
+   	grpc.&lt;span style=&#34;color:#50fa7b&#34;&gt;KeepaliveEnforcementPolicy&lt;/span&gt;(alivePolicy),
+   	grpc.&lt;span style=&#34;color:#50fa7b&#34;&gt;InitialWindowSize&lt;/span&gt;(&lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;&amp;lt;&lt;/span&gt;&lt;span style=&#34;color:#bd93f9&#34;&gt;30&lt;/span&gt;),
+   	grpc.&lt;span style=&#34;color:#50fa7b&#34;&gt;InitialConnWindowSize&lt;/span&gt;(&lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;&amp;lt;&lt;/span&gt;&lt;span style=&#34;color:#bd93f9&#34;&gt;30&lt;/span&gt;),
+   	grpc.&lt;span style=&#34;color:#50fa7b&#34;&gt;MaxRecvMsgSize&lt;/span&gt;(&lt;span style=&#34;color:#bd93f9&#34;&gt;10&lt;/span&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;&lt;span style=&#34;color:#bd93f9&#34;&gt;1024&lt;/span&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;&lt;span style=&#34;color:#bd93f9&#34;&gt;1024&lt;/span&gt;),
+   )
+   tinykvpb.&lt;span style=&#34;color:#50fa7b&#34;&gt;RegisterTinyKvServer&lt;/span&gt;(grpcServer, server)
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;其中，&lt;code&gt;server&lt;/code&gt; 依赖于一个 &lt;code&gt;storage&lt;/code&gt; ，它是一个接口，可以根据配置文件选择raft存储实现或者单机存储实现。&lt;/p&gt;
+&lt;p&gt;我们通过两步来完成这个项目：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;实现一个单机存储引擎。&lt;/li&gt;
+&lt;li&gt;实现原始的kv服务handler。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2 id=&#34;实现一个单机存储引擎&#34;&gt;实现一个单机存储引擎。&lt;/h2&gt;
+&lt;p&gt;我们需要用一个单机存储引擎来实现这个接口：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;// Storage represents the internal-facing server part of TinyKV, it handles sending and receiving from other
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;// TinyKV nodes. As part of that responsibility, it also reads and writes data to disk (or semi-permanent memory).
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; Storage &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;interface&lt;/span&gt; {
+	&lt;span style=&#34;color:#50fa7b&#34;&gt;Start&lt;/span&gt;() &lt;span style=&#34;color:#8be9fd&#34;&gt;error&lt;/span&gt;
+	&lt;span style=&#34;color:#50fa7b&#34;&gt;Stop&lt;/span&gt;() &lt;span style=&#34;color:#8be9fd&#34;&gt;error&lt;/span&gt;
+	&lt;span style=&#34;color:#50fa7b&#34;&gt;Write&lt;/span&gt;(ctx &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;kvrpcpb.Context, batch []Modify) &lt;span style=&#34;color:#8be9fd&#34;&gt;error&lt;/span&gt;
+	&lt;span style=&#34;color:#50fa7b&#34;&gt;Reader&lt;/span&gt;(ctx &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;kvrpcpb.Context) (StorageReader, &lt;span style=&#34;color:#8be9fd&#34;&gt;error&lt;/span&gt;)
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;代码位于 &lt;code&gt;kv/storage/standalone_storage/standalone_storage.go&lt;/code&gt; 中。我们底层的存储服务使用了 &lt;code&gt;badger&lt;/code&gt; ，因此实现 &lt;code&gt;Storage&lt;/code&gt; 接口只需对 &lt;code&gt;badger&lt;/code&gt; 的api进行封装。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;type&lt;/span&gt; StandAloneStorage &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;struct&lt;/span&gt; {
+	&lt;span style=&#34;color:#6272a4&#34;&gt;// Your Data Here (1).
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	db &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;badger.DB
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;&lt;code&gt;Reader&lt;/code&gt; 方法中直接返回一个 &lt;code&gt;StandAloneStorageReader&lt;/code&gt; 即可，其中包含了一个 &lt;code&gt;badger.Txn&lt;/code&gt; 是一个事务接口，提供了读时的快照。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;Write&lt;/code&gt; 方法需要一次性 &lt;code&gt;batch&lt;/code&gt; 中的所有写入或是删除操作写入数据库。需要使用一个 &lt;code&gt;WriteBatch&lt;/code&gt; 记录下所有写操作，最后使用 &lt;code&gt;WriteBatch.WriteToDB&lt;/code&gt; 方法一次性写入 &lt;code&gt;badger&lt;/code&gt;。&lt;code&gt;badger&lt;/code&gt; 并不支持 &lt;code&gt;column family&lt;/code&gt;，因此tinykv在不同 &lt;code&gt;column family&lt;/code&gt; 上的区分只是为把不同 &lt;code&gt;column family&lt;/code&gt; 的key在编码时加上不同的前缀。&lt;/p&gt;
+&lt;h2 id=&#34;实现原始的kv服务handler&#34;&gt;实现原始的kv服务handler。&lt;/h2&gt;
+&lt;p&gt;我们需要使用刚刚实现的单机存储引擎为 &lt;code&gt;server&lt;/code&gt; 实现 &lt;code&gt;RawGet/Put/Delete/Scan&lt;/code&gt; 4个方法。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;RawGet&lt;/code&gt; 方法需要使用 &lt;code&gt;RawGetRequest&lt;/code&gt; 中的 &lt;code&gt;Context&lt;/code&gt; 初始化一个 &lt;code&gt;Reader&lt;/code&gt;，此后直接读取。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;RawPut/Delete&lt;/code&gt; 这两个写操作需要使用 &lt;code&gt;storage.Modify&lt;/code&gt; 先进行封装再调用 &lt;code&gt;Write&lt;/code&gt; 写入。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;RawScan&lt;/code&gt; 需要初始化一个迭代器 &lt;code&gt;Reader.IterCF&lt;/code&gt; ，之后直接循环读取。&lt;/p&gt;
+</description>
+        </item>
+        <item>
         <title>mit-6.824 lab4: ShardKV</title>
         <link>https://ziannchen.work/2022/mit-6.824-lab4-shardkv/</link>
         <pubDate>Fri, 04 Feb 2022 13:21:03 +0800</pubDate>

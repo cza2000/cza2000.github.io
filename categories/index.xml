@@ -6,7 +6,16 @@
     <description>Recent content in Categories on 陈子桉的博客</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>zh-CN</language>
-    <lastBuildDate>Fri, 04 Feb 2022 13:21:03 +0800</lastBuildDate><atom:link href="https://ziannchen.work/categories/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Sat, 05 Feb 2022 21:26:29 +0800</lastBuildDate><atom:link href="https://ziannchen.work/categories/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>PingCAP talent-plan</title>
+      <link>https://ziannchen.work/categories/pingcap-talent-plan/</link>
+      <pubDate>Sat, 05 Feb 2022 21:26:29 +0800</pubDate>
+      
+      <guid>https://ziannchen.work/categories/pingcap-talent-plan/</guid>
+      <description></description>
+    </item>
+    
     <item>
       <title>mit-6.824</title>
       <link>https://ziannchen.work/categories/mit-6.824/</link>

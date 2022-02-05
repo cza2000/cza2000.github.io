@@ -6,7 +6,43 @@
     <description>Recent content in Posts on 陈子桉的博客</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>zh-CN</language>
-    <lastBuildDate>Fri, 04 Feb 2022 13:21:03 +0800</lastBuildDate><atom:link href="https://ziannchen.work/post/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Sat, 05 Feb 2022 21:26:29 +0800</lastBuildDate><atom:link href="https://ziannchen.work/post/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>TinyKV Project4: Transaction</title>
+      <link>https://ziannchen.work/2022/tinykv-project4-transaction/</link>
+      <pubDate>Sat, 05 Feb 2022 21:26:29 +0800</pubDate>
+      
+      <guid>https://ziannchen.work/2022/tinykv-project4-transaction/</guid>
+      <description>在之前的几个 projects 中，我们已经构建起了基于 multi-raft 的分布式KV数据库。在 project 4 中，我们将构建一个事务系统以应对多个 clinet 的并发请求并保证快照隔离（snaps</description>
+    </item>
+    
+    <item>
+      <title>TinyKV Project3: MultiRaftKV</title>
+      <link>https://ziannchen.work/2022/tinykv-project3-multiraftkv/</link>
+      <pubDate>Sat, 05 Feb 2022 21:19:15 +0800</pubDate>
+      
+      <guid>https://ziannchen.work/2022/tinykv-project3-multiraftkv/</guid>
+      <description>在本项目中我们需要实现基于多个raft集群的KV服务器，其中的每一个raft集群只负责固定范围内的关键字，从而解决raft算法为了追求一致性</description>
+    </item>
+    
+    <item>
+      <title>TinyKV Project2: RaftKV</title>
+      <link>https://ziannchen.work/2022/tinykv-project2-raftkv/</link>
+      <pubDate>Sat, 05 Feb 2022 21:13:40 +0800</pubDate>
+      
+      <guid>https://ziannchen.work/2022/tinykv-project2-raftkv/</guid>
+      <description>在本项目中我们需要实现一个基于 raft 分布式共识算法的高可用kv存储服务器，它既需要我们实现Raft算法也需要我们知道如何实际使用它。 我们通过3个</description>
+    </item>
+    
+    <item>
+      <title>TinyKV Project1: StandaloneKV</title>
+      <link>https://ziannchen.work/2022/tinykv-project1-standalonekv/</link>
+      <pubDate>Sat, 05 Feb 2022 21:04:35 +0800</pubDate>
+      
+      <guid>https://ziannchen.work/2022/tinykv-project1-standalonekv/</guid>
+      <description>在本项目中，我们将在 column family 的支持下构建一个独立的 key / value 存储gRPC服务。在 kv/main.go 中我们初始化了一个 gRPC server，它包含了一个 tintkv.Server ，提供名为 TinyKV 的 gRPC 服</description>
+    </item>
+    
     <item>
       <title>mit-6.824 lab4: ShardKV</title>
       <link>https://ziannchen.work/2022/mit-6.824-lab4-shardkv/</link>

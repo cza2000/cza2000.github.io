@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content='构建一个基于 Percolator 的事务系统并在面临并发请求时保证快照隔离'><title>TinyKV Project4: Transaction</title>
+
+<link rel='canonical' href='https://ziannchen.work/2022/tinykv-project4-transaction/'>
+
+<link rel="stylesheet" href="/scss/style.min.0f551e1e8f12e484db7a1602fcb8eced03029344f0e9cedaf9073100eb80d3e8.css"><meta property='og:title' content='TinyKV Project4: Transaction'>
+<meta property='og:description' content='构建一个基于 Percolator 的事务系统并在面临并发请求时保证快照隔离'>
+<meta property='og:url' content='https://ziannchen.work/2022/tinykv-project4-transaction/'>
+<meta property='og:site_name' content='陈子桉的博客'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='分布式系统' /><meta property='article:published_time' content='2022-02-05T21:26:29&#43;08:00'/><meta property='article:modified_time' content='2022-02-05T21:26:29&#43;08:00'/><meta property='og:image' content='https://ziannchen.work/img/avatar.png' />
+<meta name="twitter:title" content="TinyKV Project4: Transaction">
+<meta name="twitter:description" content="构建一个基于 Percolator 的事务系统并在面临并发请求时保证快照隔离"><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://ziannchen.work/img/avatar.png' />
+    </head>
+    <body class="
+    article-page has-toc
+">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex 
+    
+        extended
+    
+">
+    
+        <div id="article-toolbar">
+            <a href="/" class="back-home">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chevron-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="15 6 9 12 15 18" />
+</svg>
+
+
+
+                <span>Back</span>
+            </a>
+        </div>
+    
+<main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+    <header class="article-category">
+        
+        <a href="/categories/pingcap-talent-plan/" >
+            PingCAP talent-plan
+        </a>
+        
+    </header>
+    
+
+    <h2 class="article-title">
+        <a href="/2022/tinykv-project4-transaction/">TinyKV Project4: Transaction</a>
+    </h2>
+
+    
+    <h3 class="article-subtitle">
+        构建一个基于 Percolator 的事务系统并在面临并发请求时保证快照隔离
+    </h3>
+    
+
+    
+    <footer class="article-time">
+        
+        <div>
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+            <time class="article-time--published">Feb 05, 2022</time>
+        </div>
+        
+
+        
+        <div>
+            <time class="article-words">
+                3603字
+            </time>
+        </div>
+        
+        <div>
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-user" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="12" cy="7" r="4" />
+  <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+</svg>
+
+
+
+            <span id="busuanzi_container_page_pv" style='display:none'>
+                本文总访问量<span id="busuanzi_value_page_pv"></span>次
+            </span>
+        </div>
+    </footer>
+    
+</div>
+</header>
+
+    <section class="article-content">
+    
+    
+    <p>在之前的几个 projects 中，我们已经构建起了基于 multi-raft 的分布式KV数据库。在 project 4 中，我们将构建一个事务系统以应对多个 clinet 的并发请求并保证快照隔离（snapshot isolation）。</p>
+<p>我们将基于<code>Percolator</code>的两阶段提交协议来构建我们的事务模型。</p>
+<h2 id="part-amvcc">Part A：MVCC</h2>
+<p>在part A中我们需要实现MVCC即多版本并发控制（multi-version concurrency control）。<code>tinykv</code>的底层存储<code>Badger</code>为我们提供了3个<code>column family</code>：<code>CfDefault</code>、<code>CfLock</code>、<code>CfWrite</code>，对应了论文中提到的3个列：<code>data</code>、<code>lock</code>、<code>write</code>。</p>
+<ul>
+<li><code>CfDefault</code>：用于暂时存储对应key的value值，将由MVCC机制来决定之后该值是否被commit或者被delete（即回滚）</li>
+<li><code>CfLock</code>：用于存储锁，如果某key存在对应key的lock，说明它正在被某个事务修改。</li>
+<li><code>CfWrite</code>：用来存储key的每个版本value值的提交时间(commit version)</li>
+<li><code>WriteKind</code>：Lock和Write都有一个write kind属性来记录本次对key进行了什么样的修改。有三种，分别是Put、Delete和Rollback。</li>
+</ul>
+<p>我们依据论文，使用<code>Badger</code>提供的读写api来完成 <code>transaction.go</code> 中的<code>MvccTxn</code>和它的方法。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-golang" data-lang="golang"><span style="color:#6272a4">// MvccTxn groups together writes as part of a single transaction. It also provides an abstraction over low-level
+</span><span style="color:#6272a4">// storage, lowering the concepts of timestamps, writes, and locks into plain keys and values.
+</span><span style="color:#6272a4"></span><span style="color:#8be9fd;font-style:italic">type</span> MvccTxn <span style="color:#8be9fd;font-style:italic">struct</span> {
+	StartTS <span style="color:#8be9fd">uint64</span>
+	Reader  storage.StorageReader
+	writes  []storage.Modify
+}
+</code></pre></div><p>MvccTxn struct中需要包含事务开始的timestamp <code>StartTS</code>，底层存储的<code>Reader</code>和用来将一系列写操作原子化的<code>writes</code>数组。</p>
+<p>这里需要注意一下<code>CfDefault</code>、<code>CfLock</code>、<code>CfWrite</code>这三个<code>column family</code>的key/value编码方式。</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th style="text-align:center"></th>
+<th style="text-align:center"><code>key</code></th>
+<th style="text-align:center"><code>value</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center"><code>CfDefault</code></td>
+<td style="text-align:center">(key, StartTS)</td>
+<td style="text-align:center">value</td>
+</tr>
+<tr>
+<td style="text-align:center"><code>CfLock</code></td>
+<td style="text-align:center">key</td>
+<td style="text-align:center">lock</td>
+</tr>
+<tr>
+<td style="text-align:center"><code>CfWrite</code></td>
+<td style="text-align:center">(key, commitTS)</td>
+<td style="text-align:center">write</td>
+</tr>
+</tbody>
+</table></div>
+<p>写、删除只需构建一个<code>storage.Modify</code>结构添加到<code>MvccTxn</code>的<code>writes</code>中即可。读操作的实现稍微复杂。</p>
+<ul>
+<li>
+<p>GetValue</p>
+<blockquote>
+<p>GetValue finds the value for key, valid at the start timestamp of this transaction.
+I.e., the most recent value committed before the start of this transaction.</p>
+</blockquote>
+<p>根据注释，这个方法要求我们读出在事务开始之前最晚写入的值。在论文中提到：一个值只有被commit后才对其他事务可见，表现为一个write记录。很容易想到应该去读 <code>CfWrite</code> 这个CF。又根据方法EncodeKey的编码规则，key按照userkey升序，userkey相同时按照timestamp降序，我们可以适当编码key并调用seek，使迭代器指向 <code>CfWrite</code> 这个CF中事务开始之前最晚写入的值。此后还需要注意两点：得到的write的key可能不等于userkey，需要特判；判断write的类型可能为<code>WriteKindDelete</code>，这表示这个userkey已经被删除，应该返回nil。最后根据write中的StartTS从<code>CfDefault</code>中读取value。</p>
+</li>
+<li>
+<p>CurrentWrite</p>
+<p>我们需要搜索：对于key，startTS和事务的开始时间相同的write。</p>
+<p>我们可以直接遍历 <code>CfWrite</code> 这个CF从中找到符合条件的write。从中找到由于userkey相同时key的编码按timestamp降序，我们在调用EncodeKey时将timestamp设置为<code>^uint64(0)</code>，之后即可遍历对于userkey的所有write。</p>
+</li>
+<li>
+<p>MostRecentWrite</p>
+<p>我们需要找到对于给定的userkey最迟的write。使用和<code>CurrentWrite</code>中相似的编码方式，在 <code>CfWrite</code> 中查找即可。</p>
+</li>
+</ul>
+<h2 id="part-bc-transactional-api">Part B&amp;C: transactional API</h2>
+<p>在Part B中我们需要实现<code>KvGet</code>, <code>KvPrewrite</code>, 和<code>KvCommit</code>三个request handler。</p>
+<h3 id="kvget">KvGet</h3>
+<p><code>KvGet</code> 根据事务的StartTS读出key对应的value，应当判断该key在读事务的StartTS处是否被其他事务上锁，即查找key是否存在锁且锁的startTS是否早于事务的startTS。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go">	txn <span style="color:#ff79c6">:=</span> mvcc.<span style="color:#50fa7b">NewMvccTxn</span>(reader, req.<span style="color:#50fa7b">GetVersion</span>())
+	lock, err <span style="color:#ff79c6">:=</span> txn.<span style="color:#50fa7b">GetLock</span>(key)
+	<span style="color:#ff79c6">if</span> err <span style="color:#ff79c6">!=</span> <span style="color:#ff79c6">nil</span> {
+		<span style="color:#ff79c6">return</span> <span style="color:#ff79c6">nil</span>, err
+	}
+
+	<span style="color:#6272a4">// lock&#39;s ts &lt;= txn&#39; ts means the key are locked before txn start and not commited yet
+</span><span style="color:#6272a4"></span>	<span style="color:#ff79c6">if</span> lock <span style="color:#ff79c6">!=</span> <span style="color:#ff79c6">nil</span> <span style="color:#ff79c6">&amp;&amp;</span> lock.Ts <span style="color:#ff79c6">&lt;=</span> txn.StartTS {
+		resp.Error = <span style="color:#ff79c6">&amp;</span>kvrpcpb.KeyError{
+			Locked: <span style="color:#ff79c6">&amp;</span>kvrpcpb.LockInfo{
+				PrimaryLock: lock.Primary,
+				LockVersion: lock.Ts,
+				Key:         key,
+				LockTtl:     lock.Ttl,
+			},
+		}
+		<span style="color:#ff79c6">return</span> resp, <span style="color:#ff79c6">nil</span>
+	}
+</code></pre></div><p>若key未被上锁，调用 <code>GetValue</code> 读取。</p>
+<h3 id="kvprewrite">KvPrewrite</h3>
+<p><code>KvPrewrite</code> 先检查每一个key是否可以被写入，并对每一个key上一个指向primary key的锁 。 <code>KvCommit</code> 检查所有锁是否仍有效并commit所有key。它们共同构成了 <code>Percolator</code> 事务的两阶段提交。</p>
+<p><code>KvPrewrite</code> 需要将value写入每个key的data列，并对该key上锁以防止其他事务的写冲突（即分别写入 <code>CfDefault</code> 和 <code>CfLock</code>）。在此之前需要判断没有其他事务也对相同的key上锁或写入。我们应循环检查每一个key是否可以被合法的prewirte。</p>
+<ul>
+<li>首先应该判断是否有其他事务在本事务开始之后提交了相同key的commit，若有则需要记录该冲突并检查下一个key。这里可以调用 <code>MostRecentWrite</code> 来找到对于key最近的commit记录，再判断是否冲突（冲突即commitTs &gt; 事务的version）。</li>
+<li>检查key是否在事务开始之前被加锁。</li>
+<li>在本地事务中写入value、lock。</li>
+</ul>
+<p>循环结束后应判断是否出现冲突，若出现冲突则直接abort本次事务，防止写-写冲突。若没有冲突，调用<code>storage.Write</code>提交对于<code>CfDefaule</code>和<code>CfLock</code>的写入。</p>
+<p><code>KvCommit</code> 需要先检查所有的锁的状态。</p>
+<ul>
+<li>若锁不存在，表明可能原事务rollback或锁过期，则本次commit失败。</li>
+<li>若锁存在，但startTS不等于本次commit请求的startVersion，表明该锁不属于我们期望commit的原事务，而是被其他事务加的锁，本次commit失败。此时需要在resp.Error中的retryable字段处记录，让client重试。</li>
+</ul>
+<p>若锁状态符合要求，删除锁并写入write以提交commit。这两个操作需要加锁latch来保证原子性。</p>
+<h3 id="kvscan">KvScan</h3>
+<p><code>KvScan</code> 一次读取 <code>multiple key/value pairs</code>。</p>
+<p>badger自带的迭代器只支持在指定的CF中按key顺序迭代，而事务要求我们只能读取在startTS之前提交的value，这需要我们对于每一个key先找到符合条件的write记录，再去<code>CfDefault</code>列中获取对应的value。</p>
+<p>下面我们实现一个支持事务的迭代器。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#6272a4">// NewScanner creates a new scanner ready to read from the snapshot in txn.
+</span><span style="color:#6272a4"></span><span style="color:#8be9fd;font-style:italic">func</span> <span style="color:#50fa7b">NewScanner</span>(startKey []<span style="color:#8be9fd">byte</span>, txn <span style="color:#ff79c6">*</span>MvccTxn) <span style="color:#ff79c6">*</span>Scanner {
+	<span style="color:#6272a4">// Your Code Here (4C).
+</span><span style="color:#6272a4"></span>	scan <span style="color:#ff79c6">:=</span> Scanner{
+		txn:     txn,
+		iter:    txn.Reader.<span style="color:#50fa7b">IterCF</span>(engine_util.CfWrite),
+		lastKey: []<span style="color:#8be9fd">byte</span>{},
+	}
+
+	scan.iter.<span style="color:#50fa7b">Seek</span>(<span style="color:#50fa7b">EncodeKey</span>(startKey, txn.StartTS))
+	<span style="color:#ff79c6">return</span> <span style="color:#ff79c6">&amp;</span>scan
+}
+</code></pre></div><p>它包含一个<code>CfWrite</code>列的迭代器。以及一个 <code>lastKey</code> 字段，它记录找到的上一个符合条件的write所对应的Key。</p>
+<p>最核心的是<code>Scanner.Next</code>函数，它返回下一个符合事务条件的key/value。</p>
+<p>首先移动迭代器，使其指向第一个满足 key != lastKey 的write记录。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go">    <span style="color:#8be9fd;font-style:italic">var</span> currentUserKey []<span style="color:#8be9fd">byte</span>
+	<span style="color:#ff79c6">for</span> scan.iter.<span style="color:#50fa7b">Valid</span>() {
+		currentUserKey = <span style="color:#50fa7b">DecodeUserKey</span>(scan.iter.<span style="color:#50fa7b">Item</span>().<span style="color:#50fa7b">KeyCopy</span>(<span style="color:#ff79c6">nil</span>))
+		<span style="color:#ff79c6">if</span> !bytes.<span style="color:#50fa7b">Equal</span>(currentUserKey, scan.lastKey) {
+			<span style="color:#ff79c6">break</span>
+		}
+
+		scan.iter.<span style="color:#50fa7b">Next</span>()
+	}
+</code></pre></div><p>循环使用seek寻找 <code>EncodeKey(currentUserKey, scan.txn.StartTS)</code> 或之后的第一个 key。需要注意在 <code>currentUserKey</code> 处可能没有在 <code>txn.StartTS</code> 之前的commit，这会使迭代器指向下一个userKey最早的commit。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go">	<span style="color:#6272a4">// now we find a key that userKey != lastKey, seek commitTs &lt; startTs
+</span><span style="color:#6272a4"></span>	<span style="color:#ff79c6">for</span> currentCommitTs &gt; scan.txn.StartTS {
+		scan.iter.<span style="color:#50fa7b">Seek</span>(<span style="color:#50fa7b">EncodeKey</span>(currentUserKey, scan.txn.StartTS))
+		<span style="color:#ff79c6">if</span> !scan.iter.<span style="color:#50fa7b">Valid</span>() {
+			<span style="color:#ff79c6">return</span> <span style="color:#ff79c6">nil</span>, <span style="color:#ff79c6">nil</span>, <span style="color:#ff79c6">nil</span>
+		}
+
+		currentUserKey = <span style="color:#50fa7b">DecodeUserKey</span>(scan.iter.<span style="color:#50fa7b">Item</span>().<span style="color:#50fa7b">KeyCopy</span>(<span style="color:#ff79c6">nil</span>))
+		currentCommitTs = <span style="color:#50fa7b">decodeTimestamp</span>(scan.iter.<span style="color:#50fa7b">Item</span>().<span style="color:#50fa7b">KeyCopy</span>(<span style="color:#ff79c6">nil</span>))
+	}
+</code></pre></div><p>这样我们便找到了下一个commitTS符合要求的userkey，只需去 <code>CfDefault</code> 中读取value即可。</p>
+<p>此后我们可以简单的实现 <code>KvScan</code> ，只需根据startKey和limit建立事务迭代器实例，并循环调用<code>Next</code>获取key / value对。</p>
+<h3 id="kvchecktxnstatus">KvCheckTxnStatus</h3>
+<p><code>KvCheckTxnStatus</code> 报告事务的状态，并回滚过期的锁。</p>
+<p>需要注意 <code>CheckTxnStatusResponse</code> 中给出的注释。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go">    <span style="color:#6272a4">// Three kinds of txn status:
+</span><span style="color:#6272a4"></span>    <span style="color:#6272a4">// locked: lock_ttl &gt; 0
+</span><span style="color:#6272a4"></span>    <span style="color:#6272a4">// committed: commit_version &gt; 0
+</span><span style="color:#6272a4"></span>    <span style="color:#6272a4">// rolled back: lock_ttl == 0 &amp;&amp; commit_version == 0
+</span></code></pre></div><p>为了确认事务是否以及被回滚或提交，应当先查找 (primary key, lockTS) 对应的write记录，这里可以使用 <code>CurrentWrite</code> 函数，这要求我们使用req.lockTS来初始化本次事务。若存在write记录，设置 <code>resp.Action = kvrpcpb.Action_NoAction</code>。还需要判断write的类型，若类型为 <code>WriteKindRollback</code> 则需要在resp中的 <code>CommitVersion</code> 记录write
+的commitTS。</p>
+<p>之后需要确认锁的状态。若锁不存在，则需要回滚primary key，并记录 <code>resp.Action = kvrpcpb.Action_LockNotExistRollback</code>。若锁存在，判断ttl是否过期。若过期则删除锁和value并回滚，并记录 <code>resp.Action = kvrpcpb.Action_TTLExpireRollback</code>。这里判断ttl需要使用 <code>physical time</code>。</p>
+<p>若锁仍有效，在 <code>resp.LockTtl</code> 字段中记录剩余ttl并返回。</p>
+<h3 id="kvbatchrollback">KvBatchRollback</h3>
+<p><code>KvBatchRollback</code> 批量回滚事务。检查每个key是否仍被原事务上锁，如果是则删除锁和value，回滚该事务。</p>
+<p>循环检查每一个key</p>
+<ul>
+<li>
+<p>检查该key是否已经被回滚或提交。若已被回滚则忽略该key，若已被commit则在<code>resp.Error.Abort</code> 中记录错误信息并直接返回。可以调用 <code>MostRecentWrite</code> 来获取最近提交的write。</p>
+</li>
+<li>
+<p>检查该key是否存在锁。</p>
+<ul>
+<li>若不存在，直接回滚该key。</li>
+<li>若存在。
+<ul>
+<li>锁不属于原事务，视为出错，回滚该事务。</li>
+<li>锁仍属于原事务，执行所有回滚步骤，删除锁、value，再回滚。</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>若循环过程中发生出错则不将txn中的writes写入storage，即一个key出错视为全部出错。</p>
+<h3 id="kvresolvelock">KvResolveLock</h3>
+<p><code>KvResolveLock</code> 将查找属于具有给定开始时间戳的事务的所有锁，要么将他们全部回滚，要么全部commit。</p>
+<p>首先要根据startVersion找到所有的lock，我们遍历<code>CfLock</code>找到所有满足 <code>lock.Ts == req.StartVersion</code> 的lock。之后根据 <code>req.CommitVersion</code> 是否为零决定回滚或是commit，相应操作可以直接调用 <code>KvBatchRollback</code> 或者 <code>KvCommit</code> 。</p>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/%E5%88%86%E5%B8%83%E5%BC%8F%E7%B3%BB%E7%BB%9F/">分布式系统</a>
+        
+    </section>
+
+
+    </footer>
+
+
+    
+</article>
+
+    
+
+    <aside class="related-contents--wrapper">
+    
+    
+        <h2 class="section-title">Related contents</h2>
+        <div class="related-contents">
+            <div class="flex article-list--tile">
+                
+                    
+<article class="">
+    <a href="/2022/tinykv-project3-multiraftkv/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">TinyKV Project3: MultiRaftKV</h2>
+        </div>
+    </a>
+</article>
+                
+                    
+<article class="">
+    <a href="/2022/tinykv-project2-raftkv/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">TinyKV Project2: RaftKV</h2>
+        </div>
+    </a>
+</article>
+                
+                    
+<article class="">
+    <a href="/2022/tinykv-project1-standalonekv/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">TinyKV Project1: StandaloneKV</h2>
+        </div>
+    </a>
+</article>
+                
+            </div>
+        </div>
+    
+</aside>
+
+     
+    
+        
+    <script src="https://utteranc.es/client.js" 
+        repo="cza2000/cza2000.github.io"
+        issue-term="title"
+        
+        label="github-light"
+        
+        crossorigin="anonymous"
+        async
+        >
+</script>
+
+<style>
+    .utterances {
+        max-width: unset;
+    }
+</style>
+
+<script>
+    function setUtterancesTheme(theme) {
+        let utterances = document.querySelector('.utterances iframe');
+        if (utterances) {
+            utterances.contentWindow.postMessage(
+                {
+                    type: 'set-theme',
+                    theme: `github-${theme}`
+                },
+                'https://utteranc.es'
+            );
+        }
+    }
+
+    addEventListener('message', event => {
+        if (event.origin !== 'https://utteranc.es') return;
+        setUtterancesTheme(document.documentElement.dataset.scheme)
+    });
+
+    window.addEventListener('onColorSchemeChange', (e) => {
+        setUtterancesTheme(e.detail)
+    })
+</script>
+
+
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy;
+        
+        2022 陈子桉的博客
+
+    </section>
+
+    <section class="powerby">
+        Built with <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> <br />
+        Theme <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener"
+                data-version="3.7.0">Stack</a></b> designed by <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a>
+        <br />
+        <span id="busuanzi_container_site_uv" style='display:none'>
+            本站总访问量<span id="busuanzi_value_site_uv"></span>次
+        </span>
+    </section>
+</footer>
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.css"integrity="sha256-c0uckgykQ9v5k&#43;IqViZOZKc47Jn7KQil4/MP3ySA3F8="crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.css"integrity="sha256-SBLU4vv6CA6lHsZ1XyTdhyjJxCjPif/TRkjnsyGAGnE="crossorigin="anonymous"
+            >
+
+            </main>
+    
+        <aside class="sidebar right-sidebar sticky">
+            <section class="widget archives">
+                <div class="widget-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+                </div>
+                <h2 class="widget-title section-title">Table of contents</h2>
+                
+                <div class="widget--toc">
+                    <nav id="TableOfContents">
+  <ol>
+    <li><a href="#part-amvcc">Part A：MVCC</a></li>
+    <li><a href="#part-bc-transactional-api">Part B&amp;C: transactional API</a>
+      <ol>
+        <li><a href="#kvget">KvGet</a></li>
+        <li><a href="#kvprewrite">KvPrewrite</a></li>
+        <li><a href="#kvscan">KvScan</a></li>
+        <li><a href="#kvchecktxnstatus">KvCheckTxnStatus</a></li>
+        <li><a href="#kvbatchrollback">KvBatchRollback</a></li>
+        <li><a href="#kvresolvelock">KvResolveLock</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+                </div>
+            </section>
+        </aside>
+    
+
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.5/dist/vibrant.min.js"integrity="sha256-5NovOZc4iwiAWTYIFiIM7DxKUXKWvpVEuMEPLzcm5/g="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+<script src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js" async></script>
+    </body>
+</html>
