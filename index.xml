@@ -1711,6 +1711,9 @@ git push
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h2 id=&#34;todo&#34;&gt;TODO&lt;/h2&gt;
 &lt;ul&gt;
 &lt;li&gt;考虑弄个 CDN&lt;/li&gt;
+&lt;li&gt;DONE 加了个访问量统计
+&lt;a class=&#34;link&#34; href=&#34;http://ibruce.info/2015/04/04/busuanzi/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;不蒜子&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;
 </description>
         </item>
