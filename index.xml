@@ -780,7 +780,7 @@ ok  	6.824/shardctrler	5.641s
 	currConfig       shardctrler.Config
 	persister        &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;raft.Persister
 	scClerk          &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;shardctrler.Clerk
-	notifyChans      &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;]&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; CommandResponse
+	waitChs      	 &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;]&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; CommandResponse
 	db               &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;]&lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Shard
 	lastAppliedIndex &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
 }
@@ -816,7 +816,7 @@ ok  	6.824/shardctrler	5.641s
 	kv.rf = raft.&lt;span style=&#34;color:#50fa7b&#34;&gt;Make&lt;/span&gt;(servers, me, persister, kv.applyCh)
 	kv.scClerk = shardctrler.&lt;span style=&#34;color:#50fa7b&#34;&gt;MakeClerk&lt;/span&gt;(kv.ctrlers)
 	kv.mu = sync.RWMutex{}
-	kv.notifyChans = &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;make&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;]&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; CommandResponse)
+	kv.waitChs = &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;make&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;]&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; CommandResponse)
 	kv.db = &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;make&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;]&lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;Shard)
 	&lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; i &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#bd93f9&#34;&gt;0&lt;/span&gt;; i &amp;lt; shardctrler.NShards; i&lt;span style=&#34;color:#ff79c6&#34;&gt;++&lt;/span&gt; {
 		kv.db[i] = &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;Shard{
@@ -907,7 +907,7 @@ ok  	6.824/shardctrler	5.641s
 					req &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; command.Data.(EraseDataRequest)
 					response = kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;applyEraseData&lt;/span&gt;(req, applyMsg.CommandIndex)
 					&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; currentTerm, isLeader &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;GetState&lt;/span&gt;(); currentTerm &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; applyMsg.CommandTerm &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; isLeader {
-						ch &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;getNotifyChan&lt;/span&gt;(applyMsg.CommandIndex)
+						ch &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;getWaitCh&lt;/span&gt;(applyMsg.CommandIndex)
 						ch &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;response
 					}
 
@@ -915,7 +915,7 @@ ok  	6.824/shardctrler	5.641s
 					request &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; command.Data.(CommandRequest)
 					response = kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;applyClientRequest&lt;/span&gt;(&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;request, applyMsg.CommandIndex)
 					&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; currentTerm, isLeader &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;GetState&lt;/span&gt;(); currentTerm &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; applyMsg.CommandTerm &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; isLeader {
-						ch &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;getNotifyChan&lt;/span&gt;(applyMsg.CommandIndex)
+						ch &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;getWaitCh&lt;/span&gt;(applyMsg.CommandIndex)
 						ch &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;response
 					}
 				}
@@ -1101,7 +1101,7 @@ ok  	6.824/shardctrler	5.641s
 	}
 
 	kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;Lock&lt;/span&gt;()
-	ch &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;getNotifyChan&lt;/span&gt;(index)
+	ch &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;getWaitCh&lt;/span&gt;(index)
 	kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;Unlock&lt;/span&gt;()
 
 	&lt;span style=&#34;color:#ff79c6&#34;&gt;select&lt;/span&gt; {
@@ -1114,7 +1114,7 @@ ok  	6.824/shardctrler	5.641s
 
 	&lt;span style=&#34;color:#ff79c6&#34;&gt;go&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt;() {
 		kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;Lock&lt;/span&gt;()
-		kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;removeNotifyChan&lt;/span&gt;(index)
+		kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;removeWaitCh&lt;/span&gt;(index)
 		kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;Unlock&lt;/span&gt;()
 	}()
 }
@@ -1225,7 +1225,7 @@ ok  	6.824/shardkv	108.040s
 &lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;
 	&lt;span style=&#34;color:#6272a4&#34;&gt;// Your definitions here.
 &lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	persister        &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;raft.Persister
-	notifyChans      &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;]&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;CommandResponse
+	waitChs      	 &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;]&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;CommandResponse
 	db               &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;]&lt;span style=&#34;color:#8be9fd&#34;&gt;string&lt;/span&gt;
 	lastSessions     &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;map&lt;/span&gt;[&lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;]Session
 	lastAppliedIndex &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;
@@ -1233,9 +1233,9 @@ ok  	6.824/shardkv	108.040s
 &lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h3 id=&#34;state-machine&#34;&gt;state-machine&lt;/h3&gt;
 &lt;p&gt;本次lab中只需使用一个内存版本的 KV 状态机 map[string]string。&lt;/p&gt;
 &lt;h3 id=&#34;rpc-handler&#34;&gt;RPC handler&lt;/h3&gt;
-&lt;p&gt;客户端请求来临时，Server端会启动一个协程作为RPC handler来处理客户端请求，其中会调用 &lt;code&gt;Raft.Start&lt;/code&gt; 函数将请求下放到Raft层形成一条日志去做共识。在Raft层，每条被commit的日志会按照index的顺序写入applyCh中，上层必须也按index序从applyCh中读出日志并应用于状态机，这样才能保证不同节点上的数据一致。&lt;/p&gt;
+&lt;p&gt;客户端请求来临时，Server端会启动一个协程作为 RPC handler 来处理客户端请求，其中会调用 &lt;code&gt;Raft.Start&lt;/code&gt; 函数将请求下放到 Raft 层形成一条日志去做共识。在 Raft 层，每条被commit的日志会按照 index 的顺序写入 applyCh 中，上层必须也按 index 序从applyCh中读出日志并应用于状态机，这样才能保证不同节点上的数据一致。&lt;/p&gt;
 &lt;p&gt;这要求必须有一个单独的applier协程来循环读applyCh，并应用于状态机。由于来自不同客户端的请求是并发的，如果在RPC handler协程中直接读applyCh无法保证index序。返回给客户端的response要根据日志应用于状态机的结果来生成，这需要我们处理RPC handler和applier协程之间的通信问题。&lt;/p&gt;
-&lt;p&gt;自然想到使用channel来通信，使用一个 notifyChans map (log index -&amp;gt; response) 来记录每一个请求对应的channel。在RPC handler协程将日志下放到Raft层之后，在notifyChans中注册一个channel并阻塞读，applier协程读出日志，应用于状态机之后生成response写入这个channel。RPC handler协程在规定时间内读出结果则正常返回客户端，若超时则返回超时。&lt;/p&gt;
+&lt;p&gt;自然想到使用channel来通信，使用一个 waitChs map (log index -&amp;gt; response) 来记录每一个请求对应的channel。在RPC handler协程将日志下放到Raft层之后，在 waitChs 中注册一个channel并阻塞读，applier协程读出日志，应用于状态机之后生成response写入这个channel。RPC handler协程在规定时间内读出结果则正常返回客户端，若超时则返回超时。&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (kv &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;KVServer) &lt;span style=&#34;color:#50fa7b&#34;&gt;Command&lt;/span&gt;(req &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;CommandRequest, resp &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;CommandResponse) {
 	&lt;span style=&#34;color:#6272a4&#34;&gt;// Your code here.
 &lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;&lt;/span&gt;	kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;RLock&lt;/span&gt;()
@@ -1257,7 +1257,7 @@ ok  	6.824/shardkv	108.040s
 
 	&lt;span style=&#34;color:#50fa7b&#34;&gt;DPrintf&lt;/span&gt;(&lt;span style=&#34;color:#f1fa8c&#34;&gt;&amp;#34;[KVServer %d] add command into raft layer [index %d]&amp;#34;&lt;/span&gt;, kv.me, index)
 	kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;Lock&lt;/span&gt;()
-	ch &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;getNotifyChan&lt;/span&gt;(index)
+	ch &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;getWaitCh&lt;/span&gt;(index)
 	kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;Unlock&lt;/span&gt;()
 
 	&lt;span style=&#34;color:#ff79c6&#34;&gt;select&lt;/span&gt; {
@@ -1271,7 +1271,7 @@ ok  	6.824/shardkv	108.040s
 
 	&lt;span style=&#34;color:#ff79c6&#34;&gt;go&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt;() {
 		kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;Lock&lt;/span&gt;()
-		kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;removeNotifyChan&lt;/span&gt;(index)
+		kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;removeWaitCh&lt;/span&gt;(index)
 		kv.mu.&lt;span style=&#34;color:#50fa7b&#34;&gt;Unlock&lt;/span&gt;()
 	}()
 }
@@ -1311,7 +1311,7 @@ ok  	6.824/shardkv	108.040s
 				}
 
 				&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; currentTerm, isLeader &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.rf.&lt;span style=&#34;color:#50fa7b&#34;&gt;GetState&lt;/span&gt;(); currentTerm &lt;span style=&#34;color:#ff79c6&#34;&gt;==&lt;/span&gt; applyMsg.CommandTerm &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; isLeader {
-					ch &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;getNotifyChan&lt;/span&gt;(applyMsg.CommandIndex)
+					ch &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.&lt;span style=&#34;color:#50fa7b&#34;&gt;getWaitCh&lt;/span&gt;(applyMsg.CommandIndex)
 					ch &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;-&lt;/span&gt; response
 				}
 
@@ -1334,20 +1334,20 @@ ok  	6.824/shardkv	108.040s
 &lt;p&gt;apply日志时需要防止状态机回滚。在lab2中提到作为follower的节点可能收到leader的install snapshot，将snapshot写入applyCh中，此时读applyCh的顺序是：旧日志1 -&amp;gt; 新快照 -&amp;gt; 旧日志2。应用了新快照之后要避免再次应用旧日志，所以应用快照之后也要更新 lastAppliedIndex，应用日志时要先判断是否 applyMsg.CommandIndex &amp;lt;= kv.lastAppliedIndex。&lt;/p&gt;
 &lt;/li&gt;
 &lt;li&gt;
-&lt;p&gt;仅对leader的notifyChan进行通知。每个节点在读出日志后都要提交到状态机，且更新lastSessions。但只有leader需要将response写入notifyChan。leader可能会在提交日志后失去leader身份，所以在applier中写入response前要先判断。此时RPC handler协程就让其超时。&lt;/p&gt;
+&lt;p&gt;仅对leader的waitCh进行通知。每个节点在读出日志后都要提交到状态机，且更新lastSessions。但只有leader需要将response写入waitCh。leader可能会在提交日志后失去leader身份，所以在applier中写入response前要先判断。此时RPC handler协程就让其超时。&lt;/p&gt;
 &lt;/li&gt;
 &lt;li&gt;
 &lt;p&gt;客户端的非读请求需要两次去重。重复的请求到来时，之前相同的请求可能已经被应用于该节点的状态机，也可能其对应的日志还没被commit。因此需要在RPC handler中调用Start之前以及日志commit之后应用于状态机之前两次去重。&lt;/p&gt;
 &lt;/li&gt;
 &lt;li&gt;
-&lt;p&gt;leader在调用Start提交日志后去获取notifyChan来阻塞读 以及 applier 在commit日志并应用于状态机之后获取notifyChan来写入response 这二者之间顺序无法保证。因此channel容量设置为1，先获取channel的协程要负责创建channel，这个过程要加写锁。&lt;/p&gt;
+&lt;p&gt;leader在调用Start提交日志后去获取waitCh来阻塞读 以及 applier 在commit日志并应用于状态机之后获取waitCh来写入response 这二者之间顺序无法保证。因此channel容量设置为1，先获取channel的协程要负责创建channel，这个过程要加写锁。&lt;/p&gt;
 &lt;/li&gt;
 &lt;/ul&gt;
-&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (kv &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;KVServer) &lt;span style=&#34;color:#50fa7b&#34;&gt;getNotifyChan&lt;/span&gt;(index &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;) &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;CommandResponse {
-	ch, ok &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.notifyChans[index]
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;func&lt;/span&gt; (kv &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;KVServer) &lt;span style=&#34;color:#50fa7b&#34;&gt;getWaitCh&lt;/span&gt;(index &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt;) &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;CommandResponse {
+	ch, ok &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; kv.waitChs[index]
 	&lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; !ok {
 		ch &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;make&lt;/span&gt;(&lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;chan&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;CommandResponse, &lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt;)
-		kv.notifyChans[index] = ch
+		kv.waitChs[index] = ch
 		&lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; ch
 	}
 

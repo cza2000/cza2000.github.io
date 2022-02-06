@@ -349,7 +349,7 @@ ok  	6.824/shardctrler	5.641s
 	currConfig       shardctrler.Config
 	persister        <span style="color:#ff79c6">*</span>raft.Persister
 	scClerk          <span style="color:#ff79c6">*</span>shardctrler.Clerk
-	notifyChans      <span style="color:#8be9fd;font-style:italic">map</span>[<span style="color:#8be9fd">int</span>]<span style="color:#8be9fd;font-style:italic">chan</span> CommandResponse
+	waitChs      	 <span style="color:#8be9fd;font-style:italic">map</span>[<span style="color:#8be9fd">int</span>]<span style="color:#8be9fd;font-style:italic">chan</span> CommandResponse
 	db               <span style="color:#8be9fd;font-style:italic">map</span>[<span style="color:#8be9fd">int</span>]<span style="color:#ff79c6">*</span>Shard
 	lastAppliedIndex <span style="color:#8be9fd">int</span>
 }
@@ -385,7 +385,7 @@ ok  	6.824/shardctrler	5.641s
 	kv.rf = raft.<span style="color:#50fa7b">Make</span>(servers, me, persister, kv.applyCh)
 	kv.scClerk = shardctrler.<span style="color:#50fa7b">MakeClerk</span>(kv.ctrlers)
 	kv.mu = sync.RWMutex{}
-	kv.notifyChans = <span style="color:#8be9fd;font-style:italic">make</span>(<span style="color:#8be9fd;font-style:italic">map</span>[<span style="color:#8be9fd">int</span>]<span style="color:#8be9fd;font-style:italic">chan</span> CommandResponse)
+	kv.waitChs = <span style="color:#8be9fd;font-style:italic">make</span>(<span style="color:#8be9fd;font-style:italic">map</span>[<span style="color:#8be9fd">int</span>]<span style="color:#8be9fd;font-style:italic">chan</span> CommandResponse)
 	kv.db = <span style="color:#8be9fd;font-style:italic">make</span>(<span style="color:#8be9fd;font-style:italic">map</span>[<span style="color:#8be9fd">int</span>]<span style="color:#ff79c6">*</span>Shard)
 	<span style="color:#ff79c6">for</span> i <span style="color:#ff79c6">:=</span> <span style="color:#bd93f9">0</span>; i &lt; shardctrler.NShards; i<span style="color:#ff79c6">++</span> {
 		kv.db[i] = <span style="color:#ff79c6">&amp;</span>Shard{
@@ -476,7 +476,7 @@ ok  	6.824/shardctrler	5.641s
 					req <span style="color:#ff79c6">:=</span> command.Data.(EraseDataRequest)
 					response = kv.<span style="color:#50fa7b">applyEraseData</span>(req, applyMsg.CommandIndex)
 					<span style="color:#ff79c6">if</span> currentTerm, isLeader <span style="color:#ff79c6">:=</span> kv.rf.<span style="color:#50fa7b">GetState</span>(); currentTerm <span style="color:#ff79c6">==</span> applyMsg.CommandTerm <span style="color:#ff79c6">&amp;&amp;</span> isLeader {
-						ch <span style="color:#ff79c6">:=</span> kv.<span style="color:#50fa7b">getNotifyChan</span>(applyMsg.CommandIndex)
+						ch <span style="color:#ff79c6">:=</span> kv.<span style="color:#50fa7b">getWaitCh</span>(applyMsg.CommandIndex)
 						ch <span style="color:#ff79c6">&lt;-</span> <span style="color:#ff79c6">*</span>response
 					}
 
@@ -484,7 +484,7 @@ ok  	6.824/shardctrler	5.641s
 					request <span style="color:#ff79c6">:=</span> command.Data.(CommandRequest)
 					response = kv.<span style="color:#50fa7b">applyClientRequest</span>(<span style="color:#ff79c6">&amp;</span>request, applyMsg.CommandIndex)
 					<span style="color:#ff79c6">if</span> currentTerm, isLeader <span style="color:#ff79c6">:=</span> kv.rf.<span style="color:#50fa7b">GetState</span>(); currentTerm <span style="color:#ff79c6">==</span> applyMsg.CommandTerm <span style="color:#ff79c6">&amp;&amp;</span> isLeader {
-						ch <span style="color:#ff79c6">:=</span> kv.<span style="color:#50fa7b">getNotifyChan</span>(applyMsg.CommandIndex)
+						ch <span style="color:#ff79c6">:=</span> kv.<span style="color:#50fa7b">getWaitCh</span>(applyMsg.CommandIndex)
 						ch <span style="color:#ff79c6">&lt;-</span> <span style="color:#ff79c6">*</span>response
 					}
 				}
@@ -670,7 +670,7 @@ ok  	6.824/shardctrler	5.641s
 	}
 
 	kv.mu.<span style="color:#50fa7b">Lock</span>()
-	ch <span style="color:#ff79c6">:=</span> kv.<span style="color:#50fa7b">getNotifyChan</span>(index)
+	ch <span style="color:#ff79c6">:=</span> kv.<span style="color:#50fa7b">getWaitCh</span>(index)
 	kv.mu.<span style="color:#50fa7b">Unlock</span>()
 
 	<span style="color:#ff79c6">select</span> {
@@ -683,7 +683,7 @@ ok  	6.824/shardctrler	5.641s
 
 	<span style="color:#ff79c6">go</span> <span style="color:#8be9fd;font-style:italic">func</span>() {
 		kv.mu.<span style="color:#50fa7b">Lock</span>()
-		kv.<span style="color:#50fa7b">removeNotifyChan</span>(index)
+		kv.<span style="color:#50fa7b">removeWaitCh</span>(index)
 		kv.mu.<span style="color:#50fa7b">Unlock</span>()
 	}()
 }

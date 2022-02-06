@@ -103,7 +103,7 @@
         
         <div>
             <time class="article-words">
-                2887字
+                2833字
             </time>
         </div>
         
@@ -186,7 +186,7 @@
 </span><span style="color:#6272a4"></span>
 	<span style="color:#6272a4">// Your definitions here.
 </span><span style="color:#6272a4"></span>	persister        <span style="color:#ff79c6">*</span>raft.Persister
-	notifyChans      <span style="color:#8be9fd;font-style:italic">map</span>[<span style="color:#8be9fd">int</span>]<span style="color:#8be9fd;font-style:italic">chan</span> <span style="color:#ff79c6">*</span>CommandResponse
+	waitChs      	 <span style="color:#8be9fd;font-style:italic">map</span>[<span style="color:#8be9fd">int</span>]<span style="color:#8be9fd;font-style:italic">chan</span> <span style="color:#ff79c6">*</span>CommandResponse
 	db               <span style="color:#8be9fd;font-style:italic">map</span>[<span style="color:#8be9fd">string</span>]<span style="color:#8be9fd">string</span>
 	lastSessions     <span style="color:#8be9fd;font-style:italic">map</span>[<span style="color:#8be9fd">int</span>]Session
 	lastAppliedIndex <span style="color:#8be9fd">int</span>
@@ -194,9 +194,9 @@
 </code></pre></div><h3 id="state-machine">state-machine</h3>
 <p>本次lab中只需使用一个内存版本的 KV 状态机 map[string]string。</p>
 <h3 id="rpc-handler">RPC handler</h3>
-<p>客户端请求来临时，Server端会启动一个协程作为RPC handler来处理客户端请求，其中会调用 <code>Raft.Start</code> 函数将请求下放到Raft层形成一条日志去做共识。在Raft层，每条被commit的日志会按照index的顺序写入applyCh中，上层必须也按index序从applyCh中读出日志并应用于状态机，这样才能保证不同节点上的数据一致。</p>
+<p>客户端请求来临时，Server端会启动一个协程作为 RPC handler 来处理客户端请求，其中会调用 <code>Raft.Start</code> 函数将请求下放到 Raft 层形成一条日志去做共识。在 Raft 层，每条被commit的日志会按照 index 的顺序写入 applyCh 中，上层必须也按 index 序从applyCh中读出日志并应用于状态机，这样才能保证不同节点上的数据一致。</p>
 <p>这要求必须有一个单独的applier协程来循环读applyCh，并应用于状态机。由于来自不同客户端的请求是并发的，如果在RPC handler协程中直接读applyCh无法保证index序。返回给客户端的response要根据日志应用于状态机的结果来生成，这需要我们处理RPC handler和applier协程之间的通信问题。</p>
-<p>自然想到使用channel来通信，使用一个 notifyChans map (log index -&gt; response) 来记录每一个请求对应的channel。在RPC handler协程将日志下放到Raft层之后，在notifyChans中注册一个channel并阻塞读，applier协程读出日志，应用于状态机之后生成response写入这个channel。RPC handler协程在规定时间内读出结果则正常返回客户端，若超时则返回超时。</p>
+<p>自然想到使用channel来通信，使用一个 waitChs map (log index -&gt; response) 来记录每一个请求对应的channel。在RPC handler协程将日志下放到Raft层之后，在 waitChs 中注册一个channel并阻塞读，applier协程读出日志，应用于状态机之后生成response写入这个channel。RPC handler协程在规定时间内读出结果则正常返回客户端，若超时则返回超时。</p>
 <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#8be9fd;font-style:italic">func</span> (kv <span style="color:#ff79c6">*</span>KVServer) <span style="color:#50fa7b">Command</span>(req <span style="color:#ff79c6">*</span>CommandRequest, resp <span style="color:#ff79c6">*</span>CommandResponse) {
 	<span style="color:#6272a4">// Your code here.
 </span><span style="color:#6272a4"></span>	kv.mu.<span style="color:#50fa7b">RLock</span>()
@@ -218,7 +218,7 @@
 
 	<span style="color:#50fa7b">DPrintf</span>(<span style="color:#f1fa8c">&#34;[KVServer %d] add command into raft layer [index %d]&#34;</span>, kv.me, index)
 	kv.mu.<span style="color:#50fa7b">Lock</span>()
-	ch <span style="color:#ff79c6">:=</span> kv.<span style="color:#50fa7b">getNotifyChan</span>(index)
+	ch <span style="color:#ff79c6">:=</span> kv.<span style="color:#50fa7b">getWaitCh</span>(index)
 	kv.mu.<span style="color:#50fa7b">Unlock</span>()
 
 	<span style="color:#ff79c6">select</span> {
@@ -232,7 +232,7 @@
 
 	<span style="color:#ff79c6">go</span> <span style="color:#8be9fd;font-style:italic">func</span>() {
 		kv.mu.<span style="color:#50fa7b">Lock</span>()
-		kv.<span style="color:#50fa7b">removeNotifyChan</span>(index)
+		kv.<span style="color:#50fa7b">removeWaitCh</span>(index)
 		kv.mu.<span style="color:#50fa7b">Unlock</span>()
 	}()
 }
@@ -272,7 +272,7 @@
 				}
 
 				<span style="color:#ff79c6">if</span> currentTerm, isLeader <span style="color:#ff79c6">:=</span> kv.rf.<span style="color:#50fa7b">GetState</span>(); currentTerm <span style="color:#ff79c6">==</span> applyMsg.CommandTerm <span style="color:#ff79c6">&amp;&amp;</span> isLeader {
-					ch <span style="color:#ff79c6">:=</span> kv.<span style="color:#50fa7b">getNotifyChan</span>(applyMsg.CommandIndex)
+					ch <span style="color:#ff79c6">:=</span> kv.<span style="color:#50fa7b">getWaitCh</span>(applyMsg.CommandIndex)
 					ch <span style="color:#ff79c6">&lt;-</span> response
 				}
 
@@ -295,20 +295,20 @@
 <p>apply日志时需要防止状态机回滚。在lab2中提到作为follower的节点可能收到leader的install snapshot，将snapshot写入applyCh中，此时读applyCh的顺序是：旧日志1 -&gt; 新快照 -&gt; 旧日志2。应用了新快照之后要避免再次应用旧日志，所以应用快照之后也要更新 lastAppliedIndex，应用日志时要先判断是否 applyMsg.CommandIndex &lt;= kv.lastAppliedIndex。</p>
 </li>
 <li>
-<p>仅对leader的notifyChan进行通知。每个节点在读出日志后都要提交到状态机，且更新lastSessions。但只有leader需要将response写入notifyChan。leader可能会在提交日志后失去leader身份，所以在applier中写入response前要先判断。此时RPC handler协程就让其超时。</p>
+<p>仅对leader的waitCh进行通知。每个节点在读出日志后都要提交到状态机，且更新lastSessions。但只有leader需要将response写入waitCh。leader可能会在提交日志后失去leader身份，所以在applier中写入response前要先判断。此时RPC handler协程就让其超时。</p>
 </li>
 <li>
 <p>客户端的非读请求需要两次去重。重复的请求到来时，之前相同的请求可能已经被应用于该节点的状态机，也可能其对应的日志还没被commit。因此需要在RPC handler中调用Start之前以及日志commit之后应用于状态机之前两次去重。</p>
 </li>
 <li>
-<p>leader在调用Start提交日志后去获取notifyChan来阻塞读 以及 applier 在commit日志并应用于状态机之后获取notifyChan来写入response 这二者之间顺序无法保证。因此channel容量设置为1，先获取channel的协程要负责创建channel，这个过程要加写锁。</p>
+<p>leader在调用Start提交日志后去获取waitCh来阻塞读 以及 applier 在commit日志并应用于状态机之后获取waitCh来写入response 这二者之间顺序无法保证。因此channel容量设置为1，先获取channel的协程要负责创建channel，这个过程要加写锁。</p>
 </li>
 </ul>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#8be9fd;font-style:italic">func</span> (kv <span style="color:#ff79c6">*</span>KVServer) <span style="color:#50fa7b">getNotifyChan</span>(index <span style="color:#8be9fd">int</span>) <span style="color:#8be9fd;font-style:italic">chan</span> <span style="color:#ff79c6">*</span>CommandResponse {
-	ch, ok <span style="color:#ff79c6">:=</span> kv.notifyChans[index]
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go"><span style="color:#8be9fd;font-style:italic">func</span> (kv <span style="color:#ff79c6">*</span>KVServer) <span style="color:#50fa7b">getWaitCh</span>(index <span style="color:#8be9fd">int</span>) <span style="color:#8be9fd;font-style:italic">chan</span> <span style="color:#ff79c6">*</span>CommandResponse {
+	ch, ok <span style="color:#ff79c6">:=</span> kv.waitChs[index]
 	<span style="color:#ff79c6">if</span> !ok {
 		ch <span style="color:#ff79c6">:=</span> <span style="color:#8be9fd;font-style:italic">make</span>(<span style="color:#8be9fd;font-style:italic">chan</span> <span style="color:#ff79c6">*</span>CommandResponse, <span style="color:#bd93f9">1</span>)
-		kv.notifyChans[index] = ch
+		kv.waitChs[index] = ch
 		<span style="color:#ff79c6">return</span> ch
 	}
 
