@@ -6,7 +6,17 @@
         <description>Recent content on 陈子桉的博客</description>
         <generator>Hugo -- gohugo.io</generator>
         <language>zh-CN</language>
-        <lastBuildDate>Sat, 05 Feb 2022 21:26:29 +0800</lastBuildDate><atom:link href="https://ziannchen.work/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Thu, 10 Feb 2022 20:01:39 +0800</lastBuildDate><atom:link href="https://ziannchen.work/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>开个坑，准备开始接着写cmu 15-445</title>
+        <link>https://ziannchen.work/2022/%E5%BC%80%E4%B8%AA%E5%9D%91%E5%87%86%E5%A4%87%E5%BC%80%E5%A7%8B%E6%8E%A5%E7%9D%80%E5%86%99cmu-15-445/</link>
+        <pubDate>Thu, 10 Feb 2022 20:01:39 +0800</pubDate>
+        
+        <guid>https://ziannchen.work/2022/%E5%BC%80%E4%B8%AA%E5%9D%91%E5%87%86%E5%A4%87%E5%BC%80%E5%A7%8B%E6%8E%A5%E7%9D%80%E5%86%99cmu-15-445/</guid>
+        <description>&lt;p&gt;在知乎上刷到了很多次 cmu 15-445，尽管数据库这课我只考了60多分 and 不咋用c++，但也在上个学期开始尝试写了一点。之后由于 b+树太难 / c++不熟悉 / 想去写 tinykv / 懒 种种原因搁置了。&lt;/p&gt;
+&lt;p&gt;工作了之后感觉不会再有这样的大段空闲时间来写lab了，最近打算重启这个lab，立个flag一定要在毕业前写完并写出解析发在博客上。由于下个学期还要浪/做毕设/学工作要用的东西/可能会去实习，咱就是说也不知道啥时候能写完。&lt;/p&gt;
+</description>
+        </item>
+        <item>
         <title>TinyKV Project4: Transaction</title>
         <link>https://ziannchen.work/2022/tinykv-project4-transaction/</link>
         <pubDate>Sat, 05 Feb 2022 21:26:29 +0800</pubDate>
