@@ -240,6 +240,22 @@
 &lt;/ol&gt;
 &lt;h3 id=&#34;flushallpagesimpl&#34;&gt;FlushAllPagesImpl&lt;/h3&gt;
 &lt;p&gt;将所有页面写回磁盘，这个没啥好说的。&lt;/p&gt;
+&lt;h2 id=&#34;测试结果&#34;&gt;测试结果&lt;/h2&gt;
+&lt;p&gt;&lt;figure 
+	&gt;
+	&lt;a href=&#34;https://ziannchen.work/img/BufferPoolManager/3.png#pic_center&#34; &gt;
+		&lt;img src=&#34;https://ziannchen.work/img/BufferPoolManager/3.png#pic_center&#34;
+			
+			
+			
+			loading=&#34;lazy&#34;
+			alt=&#34;图片 3&#34;&gt;
+	&lt;/a&gt;
+	
+	&lt;figcaption&gt;图片 3&lt;/figcaption&gt;
+	
+&lt;/figure&gt;&lt;/p&gt;
+&lt;p&gt;值得一提的是这个 2020 的 autograder 似乎用不了了。googletest 把它的 github 上的分支从 master 改成了 main，但测试构建脚本还是会从 master 分支去拉东西，然后就会失败。&lt;/p&gt;
 </description>
         </item>
         <item>
