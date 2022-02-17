@@ -6,7 +6,16 @@
     <description>Recent content in Posts on 陈子桉的博客</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>zh-CN</language>
-    <lastBuildDate>Thu, 10 Feb 2022 20:01:39 +0800</lastBuildDate><atom:link href="https://ziannchen.work/post/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Wed, 16 Feb 2022 23:15:13 +0800</lastBuildDate><atom:link href="https://ziannchen.work/post/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>CMU 15-445 Project 1: Buffer Pool Manager</title>
+      <link>https://ziannchen.work/2022/cmu-15-445-project-1-buffer-pool-manager/</link>
+      <pubDate>Wed, 16 Feb 2022 23:15:13 +0800</pubDate>
+      
+      <guid>https://ziannchen.work/2022/cmu-15-445-project-1-buffer-pool-manager/</guid>
+      <description>buffer pool 负责将物理页在内存与磁盘之间来回移动，它允许 DBMS 支持大于系统可用内存量的数据库。缓冲池的操作对系统中的其他部分是透明的。例如，系统使用其唯</description>
+    </item>
+    
     <item>
       <title>开个坑，准备开始接着写cmu 15-445</title>
       <link>https://ziannchen.work/2022/%E5%BC%80%E4%B8%AA%E5%9D%91%E5%87%86%E5%A4%87%E5%BC%80%E5%A7%8B%E6%8E%A5%E7%9D%80%E5%86%99cmu-15-445/</link>

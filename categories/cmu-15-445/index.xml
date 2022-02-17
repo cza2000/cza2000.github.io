@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>数据库 on 陈子桉的博客</title>
-    <link>https://ziannchen.work/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/</link>
-    <description>Recent content in 数据库 on 陈子桉的博客</description>
+    <title>CMU 15-445 on 陈子桉的博客</title>
+    <link>https://ziannchen.work/categories/cmu-15-445/</link>
+    <description>Recent content in CMU 15-445 on 陈子桉的博客</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>zh-CN</language>
-    <lastBuildDate>Wed, 16 Feb 2022 23:15:13 +0800</lastBuildDate><atom:link href="https://ziannchen.work/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Wed, 16 Feb 2022 23:15:13 +0800</lastBuildDate><atom:link href="https://ziannchen.work/categories/cmu-15-445/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>CMU 15-445 Project 1: Buffer Pool Manager</title>
       <link>https://ziannchen.work/2022/cmu-15-445-project-1-buffer-pool-manager/</link>

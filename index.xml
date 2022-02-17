@@ -6,7 +6,243 @@
         <description>Recent content on 陈子桉的博客</description>
         <generator>Hugo -- gohugo.io</generator>
         <language>zh-CN</language>
-        <lastBuildDate>Thu, 10 Feb 2022 20:01:39 +0800</lastBuildDate><atom:link href="https://ziannchen.work/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Wed, 16 Feb 2022 23:15:13 +0800</lastBuildDate><atom:link href="https://ziannchen.work/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>CMU 15-445 Project 1: Buffer Pool Manager</title>
+        <link>https://ziannchen.work/2022/cmu-15-445-project-1-buffer-pool-manager/</link>
+        <pubDate>Wed, 16 Feb 2022 23:15:13 +0800</pubDate>
+        
+        <guid>https://ziannchen.work/2022/cmu-15-445-project-1-buffer-pool-manager/</guid>
+        <description>&lt;p&gt;buffer pool 负责将物理页在内存与磁盘之间来回移动，它允许 DBMS 支持大于系统可用内存量的数据库。缓冲池的操作对系统中的其他部分是透明的。例如，系统使用其唯一标识符 page_id 向 buffer pool 请求一个页面，但系统不需要知道该页面是否已在内存中，由 buffer pool 负责在被请求的页面不在内存中时从磁盘检索该页面，并完成可能的内存页面替换。&lt;/p&gt;
+&lt;p&gt;&lt;figure 
+	&gt;
+	&lt;a href=&#34;https://ziannchen.work/img/BufferPoolManager/1.png#pic_center&#34; &gt;
+		&lt;img src=&#34;https://ziannchen.work/img/BufferPoolManager/1.png#pic_center&#34;
+			
+			
+			
+			loading=&#34;lazy&#34;
+			alt=&#34;图片 1&#34;&gt;
+	&lt;/a&gt;
+	
+	&lt;figcaption&gt;图片 1&lt;/figcaption&gt;
+	
+&lt;/figure&gt;&lt;/p&gt;
+&lt;h2 id=&#34;lru-replacer&#34;&gt;LRU Replacer&lt;/h2&gt;
+&lt;p&gt;该组件负责跟踪缓冲池中的页面使用情况。&lt;/p&gt;
+&lt;p&gt;在内存中且未在被使用（被 Unpin）的 Page 对应的 frame 的 id 会进入 LRUReplacer，等待在内存已满且需要从磁盘中交换页面时被淘汰。LRU 替换策略要求我们能根据最近的被使用时间来选择淘汰目标，一个简单的想法就是使用一个链表记录每一个元素，新加入的在链表头，那么链表尾的自然就是最近最少被使用的。Pin 操作需要在其中检索并删除元素，则又需要一个哈希表记录每个元素在链表中的位置。此外，还需要一个锁来保证线程安全。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-c++&#34; data-lang=&#34;c++&#34;&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;class&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;LRUReplacer&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;:&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;public&lt;/span&gt; Replacer {
+    ···
+&lt;span style=&#34;color:#ff79c6&#34;&gt;private&lt;/span&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;:&lt;/span&gt;
+    size_t num_pages_;
+    std&lt;span style=&#34;color:#ff79c6&#34;&gt;::&lt;/span&gt;mutex latch_;
+    std&lt;span style=&#34;color:#ff79c6&#34;&gt;::&lt;/span&gt;list&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;&lt;/span&gt;frame_id_t&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;gt;&lt;/span&gt; lru_list_;
+    std&lt;span style=&#34;color:#ff79c6&#34;&gt;::&lt;/span&gt;unordered_map&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;&lt;/span&gt;frame_id_t, std&lt;span style=&#34;color:#ff79c6&#34;&gt;::&lt;/span&gt;list&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;&lt;/span&gt;frame_id_t&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;gt;::&lt;/span&gt;iterator&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;gt;&lt;/span&gt; lru_map_;
+};
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;下面的实现就非常简单了，注意几点：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;每个函数都要加锁，可以使用 &lt;code&gt;std::lock_guard&lt;/code&gt;，类似 golang 中的 &lt;code&gt;defer&lt;/code&gt;。&lt;/li&gt;
+&lt;li&gt;在实现 &lt;code&gt;Unpin&lt;/code&gt; 时确保链表的长度不超过 LRUReplacer 的容量，已满时先从链表末尾删除再将新的加入链表头。不要忘了操作哈希表。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id=&#34;buffer-pool-manager&#34;&gt;Buffer Pool Manager&lt;/h2&gt;
+&lt;p&gt;BufferPoolManager 负责从 DiskManager 获取数据库的物理页面并将它们存储在内存中。BufferPoolManage 还可以在被要求或者需要时淘汰一个页以便为新页腾出空间时，将脏页写入磁盘。&lt;/p&gt;
+&lt;p&gt;系统中的所有内存页面均由 Page 对象表示，BufferPoolManager 类维护了一个存放 Page 类型对象的数组。Page 对象只是缓冲池中用于存储内存页面的容器，因此并不特定于唯一页面。也就是说，每个 Page 对象都包含一块内存（data_），被认为是存放 &amp;ldquo;DiskManager 从磁盘读取到的物理页面内容&amp;rdquo; 的位置，project 2将会调用 Page::GetData 方法获取指向 data_ 的指针，再使用 reinterpret_cast 将其转换为其他类型的指针。BufferPoolManager 将在把物理页面从内存来回移动到磁盘时重用相同的 Page 对象来存储不同页面的数据。这意味着在系统的整个生命周期中，相同的 Page 对象可能包含不同的物理页面。Page 对象的标识符（page_id）跟踪其当前包含的物理页面。如果 Page 对象不再包含物理页面，则必须将其 page_id 设置为INVALID_PAGE_ID。&lt;/p&gt;
+&lt;p&gt;每个 Page 对象还维护一个计数器(pin_count)，以表示正在使用该页面的线程数，类似引用计数。BufferPoolManager 不允许淘汰 pinned page。每个Page对象还跟踪它的脏标记（is_dirty）。页面在被淘汰之前必须要判断是否是脏页，脏页的内容要被写回磁盘，然后才能重用该对象。&lt;/p&gt;
+&lt;p&gt;BufferPoolManager实现将使用 Task 1 中实现的 LRUReplacer 类。它将使用 LRUReplacer 来跟踪页对象何时被访问过，以便在必须释放一个帧以为从磁盘复制新的物理页腾出空间时，它可以决定淘汰哪个页对象。&lt;/p&gt;
+&lt;p&gt;先来看一下 &lt;code&gt;Buffer Pool Manager&lt;/code&gt; 以及 &lt;code&gt;Page&lt;/code&gt; 的结构，frame_id 是用来访问 pages_ 数组的下标，page table 用于存储 page_id -&amp;gt; frame_id 的映射，这样就可以用 page_id 找到对应的 Page 对象。free_list 表示未含有实际内存页面的 Page 对象的 frame_id。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-c++&#34; data-lang=&#34;c++&#34;&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;class&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;BufferPoolManager&lt;/span&gt; {
+    ···
+    &lt;span style=&#34;color:#6272a4&#34;&gt;/** Number of pages in the buffer pool. */&lt;/span&gt;
+    size_t pool_size_;
+    &lt;span style=&#34;color:#6272a4&#34;&gt;/** Array of buffer pool pages. */&lt;/span&gt;
+    Page &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;pages_;
+    &lt;span style=&#34;color:#6272a4&#34;&gt;/** Pointer to the disk manager. */&lt;/span&gt;
+    DiskManager &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;disk_manager_ &lt;span style=&#34;color:#50fa7b&#34;&gt;__attribute__&lt;/span&gt;((__unused__));
+    &lt;span style=&#34;color:#6272a4&#34;&gt;/** Pointer to the log manager. */&lt;/span&gt;
+    LogManager &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;log_manager_ &lt;span style=&#34;color:#50fa7b&#34;&gt;__attribute__&lt;/span&gt;((__unused__));
+    &lt;span style=&#34;color:#6272a4&#34;&gt;/** Page table for keeping track of buffer pool pages. */&lt;/span&gt;
+    std&lt;span style=&#34;color:#ff79c6&#34;&gt;::&lt;/span&gt;unordered_map&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;&lt;/span&gt;page_id_t, frame_id_t&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;gt;&lt;/span&gt; page_table_;
+    &lt;span style=&#34;color:#6272a4&#34;&gt;/** Replacer to find unpinned pages for replacement. */&lt;/span&gt;
+    Replacer &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;replacer_;
+    &lt;span style=&#34;color:#6272a4&#34;&gt;/** List of free pages. */&lt;/span&gt;
+    std&lt;span style=&#34;color:#ff79c6&#34;&gt;::&lt;/span&gt;list&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;&lt;/span&gt;frame_id_t&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;gt;&lt;/span&gt; free_list_;
+    &lt;span style=&#34;color:#6272a4&#34;&gt;/** This latch protects shared data structures. We recommend updating this
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;     * comment to describe what it protects. */&lt;/span&gt;
+    std&lt;span style=&#34;color:#ff79c6&#34;&gt;::&lt;/span&gt;mutex latch_;
+};
+
+&lt;span style=&#34;color:#ff79c6&#34;&gt;class&lt;/span&gt; &lt;span style=&#34;color:#50fa7b&#34;&gt;Page&lt;/span&gt; {
+    ···
+&lt;span style=&#34;color:#ff79c6&#34;&gt;private&lt;/span&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;:&lt;/span&gt;
+    &lt;span style=&#34;color:#6272a4&#34;&gt;/** The actual data that is stored within a page. */&lt;/span&gt;
+    &lt;span style=&#34;color:#8be9fd&#34;&gt;char&lt;/span&gt; data_[PAGE_SIZE]{};
+    &lt;span style=&#34;color:#6272a4&#34;&gt;/** The ID of this page. */&lt;/span&gt;
+    page_id_t page_id_ &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; INVALID_PAGE_ID;
+    &lt;span style=&#34;color:#6272a4&#34;&gt;/** The pin count of this page. */&lt;/span&gt;
+    &lt;span style=&#34;color:#8be9fd&#34;&gt;int&lt;/span&gt; pin_count_ &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color:#bd93f9&#34;&gt;0&lt;/span&gt;;
+    &lt;span style=&#34;color:#6272a4&#34;&gt;/** True if the page is dirty, i.e. it is different from its corresponding
+&lt;/span&gt;&lt;span style=&#34;color:#6272a4&#34;&gt;     * page on disk. */&lt;/span&gt;
+    &lt;span style=&#34;color:#8be9fd&#34;&gt;bool&lt;/span&gt; is_dirty_ &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;false&lt;/span&gt;;
+    &lt;span style=&#34;color:#6272a4&#34;&gt;/** Page latch. */&lt;/span&gt;
+    ReaderWriterLatch rwlatch_;
+};
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;&lt;figure 
+	&gt;
+	&lt;a href=&#34;https://ziannchen.work/img/BufferPoolManager/2.png#pic_center&#34; &gt;
+		&lt;img src=&#34;https://ziannchen.work/img/BufferPoolManager/2.png#pic_center&#34;
+			
+			
+			
+			loading=&#34;lazy&#34;
+			alt=&#34;图片 2&#34;&gt;
+	&lt;/a&gt;
+	
+	&lt;figcaption&gt;图片 2&lt;/figcaption&gt;
+	
+&lt;/figure&gt;&lt;/p&gt;
+&lt;p&gt;翻译完这一大段话，话不多说直接来实现，每个函数的注释提示都比较详细了。&lt;/p&gt;
+&lt;p&gt;先说几点：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;不要忘了加锁 bpm 的 latch。&lt;/li&gt;
+&lt;li&gt;NewPage 和 FetchPage 返回前要自增 pin count，这是因为这两个方法被调用是因为某个线程想要使用该页面。&lt;/li&gt;
+&lt;li&gt;每个 Page 对象都有一个 rwlatch，但是不要滥用。在修改元数据的时候不需要加锁，只有在将页面写入磁盘、从磁盘读取页面时候需要加锁。这个锁是留给 Project 2 的。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;helper-method&#34;&gt;Helper method&lt;/h3&gt;
+&lt;p&gt;FetchPage 和 NewPage 都需要找到一个 replacement page，这里的代码可以复用。先在 free list 中找，再尝试让 replacer 去选取一个 Vitctim Page，这是因为 free list 中都是没有内容的 Page，一定不需要被写入磁盘。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-c++&#34; data-lang=&#34;c++&#34;&gt;&lt;span style=&#34;color:#8be9fd&#34;&gt;bool&lt;/span&gt; BufferPoolManager&lt;span style=&#34;color:#ff79c6&#34;&gt;::&lt;/span&gt;FindVictimPage(frame_id_t &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;frame_id) {
+    &lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; (&lt;span style=&#34;color:#ff79c6&#34;&gt;!&lt;/span&gt;free_list_.empty()) {
+        &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;frame_id &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; free_list_.front();
+        free_list_.pop_front();
+        &lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;true&lt;/span&gt;;
+    }
+
+    &lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; (replacer_&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;Victim(frame_id)) {
+        &lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;true&lt;/span&gt;;
+    }
+
+    frame_id &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;nullptr&lt;/span&gt;;
+    &lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;false&lt;/span&gt;;
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h3 id=&#34;fetchpageimpl&#34;&gt;FetchPageImpl&lt;/h3&gt;
+&lt;p&gt;一个进程需要使用一个页面，bpm需要根据指定的 page_id 返回存放对应物理页面的 Page。&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;先在 page table 中找 page_id 是否存在对应的 frame_id。
+&lt;ul&gt;
+&lt;li&gt;如果存在，就直接返回对应的 Page。返回前需要自增 pin_count 并调用 replacer_-&amp;gt;Pin。&lt;/li&gt;
+&lt;li&gt;如果不存在，就从 free list 或 replacer 中寻找一个 replacement page，若找不到，返回 nullptr。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;如果 replacement page 是脏页，将其写入磁盘并重置 is_dirty。&lt;/li&gt;
+&lt;li&gt;修改 page table 以及 Page 对象的元数据，从磁盘中读取 page_id 对应的物理页面。不要忘了调用 replacer_-&amp;gt;Pin，以及 pin count置为1。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-c++&#34; data-lang=&#34;c++&#34;&gt;Page &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;BufferPoolManager&lt;span style=&#34;color:#ff79c6&#34;&gt;::&lt;/span&gt;FetchPageImpl(page_id_t page_id) {
+    std&lt;span style=&#34;color:#ff79c6&#34;&gt;::&lt;/span&gt;lock_guard&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;&lt;/span&gt;std&lt;span style=&#34;color:#ff79c6&#34;&gt;::&lt;/span&gt;mutex&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;gt;&lt;/span&gt; lock_(&lt;span style=&#34;color:#ff79c6&#34;&gt;this&lt;/span&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;latch_);
+
+    std&lt;span style=&#34;color:#ff79c6&#34;&gt;::&lt;/span&gt;unordered_map&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;&lt;/span&gt;page_id_t, frame_id_t&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;gt;::&lt;/span&gt;iterator it &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt;
+        page_table_.find(page_id);
+
+    frame_id_t frame_id;
+    &lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; (it &lt;span style=&#34;color:#ff79c6&#34;&gt;!=&lt;/span&gt; page_table_.end()) {
+        frame_id &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; it&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;second;
+        Page &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;page &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;pages_[frame_id];
+        page&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;pin_count_&lt;span style=&#34;color:#ff79c6&#34;&gt;++&lt;/span&gt;;
+
+        replacer_&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;Pin(frame_id);
+        &lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; page;
+    }
+
+    &lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; (&lt;span style=&#34;color:#ff79c6&#34;&gt;!&lt;/span&gt;FindVictimPage(&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;frame_id)) {
+        &lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;nullptr&lt;/span&gt;;
+    }
+
+    Page &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;page &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;pages_[frame_id];
+    page&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;WLatch();
+    &lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; (page&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;IsDirty()) {
+        disk_manager_&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;WritePage(page&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;GetPageId(), page&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;GetData());
+        page&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;is_dirty_ &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;false&lt;/span&gt;;
+    }
+
+    page_table_.erase(page&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;GetPageId());
+    page_table_[page_id] &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; frame_id;
+
+    disk_manager_&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;ReadPage(page_id, page&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;GetData());
+
+    page&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;page_id_ &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; page_id;
+    page&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;pin_count_ &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt;;
+    replacer_&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;Pin(frame_id);
+    page&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;WUnlatch();
+
+    &lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; page;
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h3 id=&#34;unpinpageimpl&#34;&gt;UnpinPageImpl&lt;/h3&gt;
+&lt;p&gt;一个进程不再使用这个页面之后，将会调用 UnpinPage。Buffer Pool Manager  需要更新其对应的 pin count，is dirty。&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;尝试在页表中搜索 page_id。如果没有则需要返回 &lt;code&gt;true&lt;/code&gt;。我也不知道为啥，感觉有点奇怪。&lt;/li&gt;
+&lt;li&gt;如果该 page 的 pin count &amp;lt;= 0，返回 false。&lt;/li&gt;
+&lt;li&gt;当函数入参 is_dirty 为真时置 page 的 is_dirty 为真。如果入参不为真，不要把原来 page 的标志搞没了。&lt;/li&gt;
+&lt;li&gt;pin_count 自减，如果降为0，表示没有任何线程在使用该 page 了，调用 replacer 的 Unpin。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h3 id=&#34;flushpageimpl&#34;&gt;FlushPageImpl&lt;/h3&gt;
+&lt;p&gt;将一个页面写入磁盘，这里不需要判断 is dirty 和 pin count。&lt;/p&gt;
+&lt;p&gt;在页表中搜索该页。若不存在，返回 false；若存在，调用 disk_manager 的 WritePage 方法将页面写回磁盘。需要对该页加读锁。&lt;/p&gt;
+&lt;h3 id=&#34;newpageimpl&#34;&gt;NewPageImpl&lt;/h3&gt;
+&lt;p&gt;新建一个页面，并返回该页的 page_id 和 Page 对象。&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;先循环判断是否缓冲池中的所有 Page 都为 pinned，如果是则返回 nullptr。新建的页面要先写入缓冲池中的一个 Page，被 pin 过的 Page 不能被淘汰。&lt;/li&gt;
+&lt;li&gt;从 free list 或 replacer 中寻找一个 replacement page，若无法找到则返回。这里复用之前的 help method FindVictimPage。&lt;/li&gt;
+&lt;li&gt;如果该 replacement page 是脏的，将其写回磁盘。使用 DiskManager::AllocatePage 方法获得一个新的 page_id 赋给这个 Page 对象，修改 page table。不要忘了调用 ResetMemory 以及置 pin_count = 1。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-c++&#34; data-lang=&#34;c++&#34;&gt;Page &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;BufferPoolManager&lt;span style=&#34;color:#ff79c6&#34;&gt;::&lt;/span&gt;NewPageImpl(page_id_t &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;page_id) {
+    std&lt;span style=&#34;color:#ff79c6&#34;&gt;::&lt;/span&gt;lock_guard&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;&lt;/span&gt;std&lt;span style=&#34;color:#ff79c6&#34;&gt;::&lt;/span&gt;mutex&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;gt;&lt;/span&gt; lock_(&lt;span style=&#34;color:#ff79c6&#34;&gt;this&lt;/span&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;latch_);
+    &lt;span style=&#34;color:#8be9fd&#34;&gt;bool&lt;/span&gt; all_pinned &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;true&lt;/span&gt;;
+    &lt;span style=&#34;color:#ff79c6&#34;&gt;for&lt;/span&gt; (size_t i &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color:#bd93f9&#34;&gt;0&lt;/span&gt;; i &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;&lt;/span&gt; pool_size_; &lt;span style=&#34;color:#ff79c6&#34;&gt;++&lt;/span&gt;i) {
+        &lt;span style=&#34;color:#ff79c6&#34;&gt;auto&lt;/span&gt; page &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;pages_[i];
+        &lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; (page&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;GetPinCount() &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;gt;&lt;/span&gt; &lt;span style=&#34;color:#bd93f9&#34;&gt;0&lt;/span&gt;) {
+            &lt;span style=&#34;color:#ff79c6&#34;&gt;continue&lt;/span&gt;;
+        }
+
+        all_pinned &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;false&lt;/span&gt;;
+        &lt;span style=&#34;color:#ff79c6&#34;&gt;break&lt;/span&gt;;
+    }
+
+    &lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; (all_pinned) {
+        &lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;nullptr&lt;/span&gt;;
+    }
+
+    frame_id_t frame_id;
+    &lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; (&lt;span style=&#34;color:#ff79c6&#34;&gt;!&lt;/span&gt;FindVictimPage(&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;frame_id)) {
+        &lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;nullptr&lt;/span&gt;;
+    }
+
+    &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;page_id &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; disk_manager_&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;AllocatePage();
+    Page &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;page &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;amp;&lt;/span&gt;pages_[frame_id];
+    page&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;WLatch();
+    &lt;span style=&#34;color:#ff79c6&#34;&gt;if&lt;/span&gt; (page&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;IsDirty()) {
+        disk_manager_&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;WritePage(page&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;GetPageId(), page&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;GetData());
+        page&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;is_dirty_ &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;false&lt;/span&gt;;
+    }
+
+    page_table_.erase(page&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;GetPageId());
+    page&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;page_id_ &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;page_id;
+    page&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;is_dirty_ &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;false&lt;/span&gt;;
+    page&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;pin_count_ &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color:#bd93f9&#34;&gt;1&lt;/span&gt;;
+
+    page&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;ResetMemory();
+    page_table_[&lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;page_id] &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; frame_id;
+    page&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;WUnlatch();
+    &lt;span style=&#34;color:#ff79c6&#34;&gt;return&lt;/span&gt; page;
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;h3 id=&#34;deletepageimpl&#34;&gt;DeletePageImpl&lt;/h3&gt;
+&lt;p&gt;删除一个页面。&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;在页表中搜索该页，如果不存在则返回 true。&lt;/li&gt;
+&lt;li&gt;如果该页的 pin count 大于 0，返回false。这代表有线程正在使用该页。&lt;/li&gt;
+&lt;li&gt;调用 DiskManager::DeallocatePage 从磁盘删除该页，从页表删除该页对应的项，调用 ResetMemory 清空该 Page 对象的数据，置 page_id 为 INVALID_PAGE_ID，将该页加入 free list。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h3 id=&#34;flushallpagesimpl&#34;&gt;FlushAllPagesImpl&lt;/h3&gt;
+&lt;p&gt;将所有页面写回磁盘，这个没啥好说的。&lt;/p&gt;
+</description>
+        </item>
+        <item>
         <title>开个坑，准备开始接着写cmu 15-445</title>
         <link>https://ziannchen.work/2022/%E5%BC%80%E4%B8%AA%E5%9D%91%E5%87%86%E5%A4%87%E5%BC%80%E5%A7%8B%E6%8E%A5%E7%9D%80%E5%86%99cmu-15-445/</link>
         <pubDate>Thu, 10 Feb 2022 20:01:39 +0800</pubDate>
