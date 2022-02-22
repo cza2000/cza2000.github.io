@@ -40,7 +40,7 @@
       <pubDate>Sat, 05 Feb 2022 21:04:35 +0800</pubDate>
       
       <guid>https://ziannchen.work/2022/tinykv-project1-standalonekv/</guid>
-      <description>在本项目中，我们将在 column family 的支持下构建一个独立的 key / value 存储gRPC服务。在 kv/main.go 中我们初始化了一个 gRPC server，它包含了一个 tintkv.Server ，提供名为 TinyKV 的 gRPC 服</description>
+      <description>总览 4个 project，我们总体上看需要做这么多事： 根据Raft论文,实现了Raft模块,具备Leader选举,日志复制,Snapshot等</description>
     </item>
     
     <item>

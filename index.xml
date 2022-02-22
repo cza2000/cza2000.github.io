@@ -770,7 +770,24 @@ I.e., the most recent value committed before the start of this transaction.&lt;/
         <pubDate>Sat, 05 Feb 2022 21:04:35 +0800</pubDate>
         
         <guid>https://ziannchen.work/2022/tinykv-project1-standalonekv/</guid>
-        <description>&lt;p&gt;在本项目中，我们将在 &lt;code&gt;column family&lt;/code&gt; 的支持下构建一个独立的 key / value 存储gRPC服务。在 &lt;code&gt;kv/main.go&lt;/code&gt; 中我们初始化了一个 &lt;code&gt;gRPC&lt;/code&gt; server，它包含了一个 &lt;code&gt;tintkv.Server&lt;/code&gt; ，提供名为 &lt;code&gt;TinyKV&lt;/code&gt; 的 &lt;code&gt;gRPC&lt;/code&gt; 服务。&lt;/p&gt;
+        <description>&lt;h2 id=&#34;总览&#34;&gt;总览&lt;/h2&gt;
+&lt;p&gt;4个 project，我们总体上看需要做这么多事：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;根据Raft论文,实现了Raft模块,具备Leader选举,日志复制,Snapshot等基础功能,同时引入了Batch-Pipeline,
+Read-Index等优化。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;搭建了Multi-Raft架构,对数据基于Range进行分区,支持Region split和Region merge的功能。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;搭建了Scheduler模块,通过Region心跳收集,对Region进行负载调度,平衡每个Store上的Regoin和Leader。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;实现了Mvcc多版本并发控制,并基于Percolator模型,支持高性能分布式事务。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;在本次 project 中，我们将在 &lt;code&gt;column family&lt;/code&gt; 的支持下构建一个独立的 key / value 存储gRPC服务。在 &lt;code&gt;kv/main.go&lt;/code&gt; 中我们初始化了一个 &lt;code&gt;gRPC&lt;/code&gt; server，它包含了一个 &lt;code&gt;tintkv.Server&lt;/code&gt; ，提供名为 &lt;code&gt;TinyKV&lt;/code&gt; 的 &lt;code&gt;gRPC&lt;/code&gt; 服务。&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;	server &lt;span style=&#34;color:#ff79c6&#34;&gt;:=&lt;/span&gt; server.&lt;span style=&#34;color:#50fa7b&#34;&gt;NewServer&lt;/span&gt;(storage)
 
    &lt;span style=&#34;color:#8be9fd;font-style:italic&#34;&gt;var&lt;/span&gt; alivePolicy = keepalive.EnforcementPolicy{

@@ -103,7 +103,7 @@
         
         <div>
             <time class="article-words">
-                630字
+                908字
             </time>
         </div>
         
@@ -128,7 +128,24 @@
     <section class="article-content">
     
     
-    <p>在本项目中，我们将在 <code>column family</code> 的支持下构建一个独立的 key / value 存储gRPC服务。在 <code>kv/main.go</code> 中我们初始化了一个 <code>gRPC</code> server，它包含了一个 <code>tintkv.Server</code> ，提供名为 <code>TinyKV</code> 的 <code>gRPC</code> 服务。</p>
+    <h2 id="总览">总览</h2>
+<p>4个 project，我们总体上看需要做这么多事：</p>
+<ul>
+<li>
+<p>根据Raft论文,实现了Raft模块,具备Leader选举,日志复制,Snapshot等基础功能,同时引入了Batch-Pipeline,
+Read-Index等优化。</p>
+</li>
+<li>
+<p>搭建了Multi-Raft架构,对数据基于Range进行分区,支持Region split和Region merge的功能。</p>
+</li>
+<li>
+<p>搭建了Scheduler模块,通过Region心跳收集,对Region进行负载调度,平衡每个Store上的Regoin和Leader。</p>
+</li>
+<li>
+<p>实现了Mvcc多版本并发控制,并基于Percolator模型,支持高性能分布式事务。</p>
+</li>
+</ul>
+<p>在本次 project 中，我们将在 <code>column family</code> 的支持下构建一个独立的 key / value 存储gRPC服务。在 <code>kv/main.go</code> 中我们初始化了一个 <code>gRPC</code> server，它包含了一个 <code>tintkv.Server</code> ，提供名为 <code>TinyKV</code> 的 <code>gRPC</code> 服务。</p>
 <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-go" data-lang="go">	server <span style="color:#ff79c6">:=</span> server.<span style="color:#50fa7b">NewServer</span>(storage)
 
    <span style="color:#8be9fd;font-style:italic">var</span> alivePolicy = keepalive.EnforcementPolicy{
@@ -405,6 +422,7 @@
                 <div class="widget--toc">
                     <nav id="TableOfContents">
   <ol>
+    <li><a href="#总览">总览</a></li>
     <li><a href="#实现一个单机存储引擎">实现一个单机存储引擎。</a></li>
     <li><a href="#实现原始的kv服务handler">实现原始的kv服务handler。</a></li>
   </ol>
