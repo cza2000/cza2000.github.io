@@ -1,17 +1,17 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
     <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content='在知乎上刷到了很多次 cmu 15-445，尽管数据库这课我只考了60多分 and 不咋用c&#43;&#43;，但也在上个学期开始尝试写了一点。之后由于 b&#43;树太难 / c&#43;&#43;'><title>开个坑，准备开始接着写cmu 15-445</title>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content='实现一个并发安全的B&#43;树'><title>CMU 15-445 Project 2: B&#43;tree</title>
 
-<link rel='canonical' href='https://ziannchen.work/2022/%E5%BC%80%E4%B8%AA%E5%9D%91%E5%87%86%E5%A4%87%E5%BC%80%E5%A7%8B%E6%8E%A5%E7%9D%80%E5%86%99cmu-15-445/'>
+<link rel='canonical' href='https://ziannchen.work/2022/cmu-15-445-project-2-b-tree/'>
 
-<link rel="stylesheet" href="/scss/style.min.0f551e1e8f12e484db7a1602fcb8eced03029344f0e9cedaf9073100eb80d3e8.css"><meta property='og:title' content='开个坑，准备开始接着写cmu 15-445'>
-<meta property='og:description' content='在知乎上刷到了很多次 cmu 15-445，尽管数据库这课我只考了60多分 and 不咋用c&#43;&#43;，但也在上个学期开始尝试写了一点。之后由于 b&#43;树太难 / c&#43;&#43;'>
-<meta property='og:url' content='https://ziannchen.work/2022/%E5%BC%80%E4%B8%AA%E5%9D%91%E5%87%86%E5%A4%87%E5%BC%80%E5%A7%8B%E6%8E%A5%E7%9D%80%E5%86%99cmu-15-445/'>
+<link rel="stylesheet" href="/scss/style.min.0f551e1e8f12e484db7a1602fcb8eced03029344f0e9cedaf9073100eb80d3e8.css"><meta property='og:title' content='CMU 15-445 Project 2: B&#43;tree'>
+<meta property='og:description' content='实现一个并发安全的B&#43;树'>
+<meta property='og:url' content='https://ziannchen.work/2022/cmu-15-445-project-2-b-tree/'>
 <meta property='og:site_name' content='陈子桉的博客'>
-<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='数据库' /><meta property='article:published_time' content='2022-02-10T20:01:39&#43;08:00'/><meta property='article:modified_time' content='2022-02-10T20:01:39&#43;08:00'/><meta property='og:image' content='https://ziannchen.work/img/avatar.png' />
-<meta name="twitter:title" content="开个坑，准备开始接着写cmu 15-445">
-<meta name="twitter:description" content="在知乎上刷到了很多次 cmu 15-445，尽管数据库这课我只考了60多分 and 不咋用c&#43;&#43;，但也在上个学期开始尝试写了一点。之后由于 b&#43;树太难 / c&#43;&#43;"><meta name="twitter:card" content="summary_large_image">
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='数据库' /><meta property='article:tag' content='c&#43;&#43;' /><meta property='article:published_time' content='2022-03-03T15:19:56&#43;08:00'/><meta property='article:modified_time' content='2022-03-03T15:19:56&#43;08:00'/><meta property='og:image' content='https://ziannchen.work/img/avatar.png' />
+<meta name="twitter:title" content="CMU 15-445 Project 2: B&#43;tree">
+<meta name="twitter:description" content="实现一个并发安全的B&#43;树"><meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:image" content='https://ziannchen.work/img/avatar.png' />
     </head>
     <body class="
@@ -273,9 +273,13 @@
     
 
     <h2 class="article-title">
-        <a href="/2022/%E5%BC%80%E4%B8%AA%E5%9D%91%E5%87%86%E5%A4%87%E5%BC%80%E5%A7%8B%E6%8E%A5%E7%9D%80%E5%86%99cmu-15-445/">开个坑，准备开始接着写cmu 15-445</a>
+        <a href="/2022/cmu-15-445-project-2-b-tree/">CMU 15-445 Project 2: B&#43;tree</a>
     </h2>
 
+    
+    <h3 class="article-subtitle">
+        实现一个并发安全的B&#43;树
+    </h3>
     
 
     
@@ -291,14 +295,14 @@
   <path d="M3 11h16" />
   <path d="M18 16.496v1.504l1 1" />
 </svg>
-            <time class="article-time--published">Feb 10, 2022</time>
+            <time class="article-time--published">Mar 03, 2022</time>
         </div>
         
 
         
         <div>
             <time class="article-words">
-                198字
+                286字
             </time>
         </div>
         
@@ -323,9 +327,11 @@
     <section class="article-content">
     
     
-    <p>在知乎上刷到了很多次 cmu 15-445，尽管数据库这课我只考了60多分 and 不咋用c++，但也在上个学期开始尝试写了一点。之后由于 b+树太难 / c++不熟悉 / 想去写 tinykv / 懒 种种原因搁置了。</p>
-<p>工作了之后感觉不会再有这样的大段空闲时间来写lab了，最近打算重启这个lab，立个flag一定要在毕业前写完并写出解析发在博客上。由于下个学期还要浪/做毕设/学工作要用的东西/可能会去实习，咱就是说也不知道啥时候能写完。</p>
-
+    <p>本次 project 中，我们需要为 DBMS 实现索引。索引负责快速检索数据，而无需搜索数据库表中的每一行，为快速随机查找和高效访问有序记录提供了基础。</p>
+<p>索引使用B+树动态索引结构。B+树是一种平衡树，分为内部页面（B+Tree Internal Page）和叶页面（B+Tree Leaf Page），其中内部页面不储存实际数据，只为为搜索数据提供路由，叶页面包含实际的数据条目。由于树结构是动态增长和收缩的，因此需要处理拆分和合并的逻辑。这里需要区分B+树的页面与缓冲池中管理的页面，前者包含于后者，前者（B+Tree Page）是后者（Page）数据结构中的 <code>data_</code> 域，在编写代码时通常这么处理二者之间的关系。</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-c++" data-lang="c++">    Page <span style="color:#ff79c6">*</span>page <span style="color:#ff79c6">=</span> buffer_pool_manager_<span style="color:#ff79c6">-&gt;</span>FetchPage(page_id);
+    BPlusTreePage <span style="color:#ff79c6">*</span>node <span style="color:#ff79c6">=</span> <span style="color:#ff79c6">reinterpret_cast</span><span style="color:#ff79c6">&lt;</span>BPlusTreePage <span style="color:#ff79c6">*&gt;</span>(page<span style="color:#ff79c6">-&gt;</span>GetData());
+</code></pre></div>
 </section>
 
 
@@ -334,6 +340,8 @@
     <section class="article-tags">
         
             <a href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/">数据库</a>
+        
+            <a href="/tags/c&#43;&#43;/">c&#43;&#43;</a>
         
     </section>
 
@@ -348,6 +356,25 @@
 
     <aside class="related-contents--wrapper">
     
+    
+        <h2 class="section-title">Related contents</h2>
+        <div class="related-contents">
+            <div class="flex article-list--tile">
+                
+                    
+<article class="">
+    <a href="/2022/cmu-15-445-project-1-buffer-pool-manager/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">CMU 15-445 Project 1: Buffer Pool Manager</h2>
+        </div>
+    </a>
+</article>
+                
+            </div>
+        </div>
     
 </aside>
 

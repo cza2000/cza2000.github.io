@@ -6,7 +6,16 @@
     <description>Recent content in 数据库 on 陈子桉的博客</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>zh-CN</language>
-    <lastBuildDate>Wed, 16 Feb 2022 23:15:13 +0800</lastBuildDate><atom:link href="https://ziannchen.work/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Thu, 03 Mar 2022 15:19:56 +0800</lastBuildDate><atom:link href="https://ziannchen.work/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>CMU 15-445 Project 2: B&#43;tree</title>
+      <link>https://ziannchen.work/2022/cmu-15-445-project-2-b-tree/</link>
+      <pubDate>Thu, 03 Mar 2022 15:19:56 +0800</pubDate>
+      
+      <guid>https://ziannchen.work/2022/cmu-15-445-project-2-b-tree/</guid>
+      <description>本次 project 中，我们需要为 DBMS 实现索引。索引负责快速检索数据，而无需搜索数据库表中的每一行，为快速随机查找和高效访问有序记录提供了基础。 索引使用B+</description>
+    </item>
+    
     <item>
       <title>CMU 15-445 Project 1: Buffer Pool Manager</title>
       <link>https://ziannchen.work/2022/cmu-15-445-project-1-buffer-pool-manager/</link>

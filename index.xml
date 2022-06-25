@@ -6,7 +6,19 @@
         <description>Recent content on 陈子桉的博客</description>
         <generator>Hugo -- gohugo.io</generator>
         <language>zh-CN</language>
-        <lastBuildDate>Wed, 16 Feb 2022 23:15:13 +0800</lastBuildDate><atom:link href="https://ziannchen.work/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Thu, 03 Mar 2022 15:19:56 +0800</lastBuildDate><atom:link href="https://ziannchen.work/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>CMU 15-445 Project 2: B&#43;tree</title>
+        <link>https://ziannchen.work/2022/cmu-15-445-project-2-b-tree/</link>
+        <pubDate>Thu, 03 Mar 2022 15:19:56 +0800</pubDate>
+        
+        <guid>https://ziannchen.work/2022/cmu-15-445-project-2-b-tree/</guid>
+        <description>&lt;p&gt;本次 project 中，我们需要为 DBMS 实现索引。索引负责快速检索数据，而无需搜索数据库表中的每一行，为快速随机查找和高效访问有序记录提供了基础。&lt;/p&gt;
+&lt;p&gt;索引使用B+树动态索引结构。B+树是一种平衡树，分为内部页面（B+Tree Internal Page）和叶页面（B+Tree Leaf Page），其中内部页面不储存实际数据，只为为搜索数据提供路由，叶页面包含实际的数据条目。由于树结构是动态增长和收缩的，因此需要处理拆分和合并的逻辑。这里需要区分B+树的页面与缓冲池中管理的页面，前者包含于后者，前者（B+Tree Page）是后者（Page）数据结构中的 &lt;code&gt;data_&lt;/code&gt; 域，在编写代码时通常这么处理二者之间的关系。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre tabindex=&#34;0&#34; style=&#34;color:#f8f8f2;background-color:#282a36;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-c++&#34; data-lang=&#34;c++&#34;&gt;    Page &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;page &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; buffer_pool_manager_&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;FetchPage(page_id);
+    BPlusTreePage &lt;span style=&#34;color:#ff79c6&#34;&gt;*&lt;/span&gt;node &lt;span style=&#34;color:#ff79c6&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color:#ff79c6&#34;&gt;reinterpret_cast&lt;/span&gt;&lt;span style=&#34;color:#ff79c6&#34;&gt;&amp;lt;&lt;/span&gt;BPlusTreePage &lt;span style=&#34;color:#ff79c6&#34;&gt;*&amp;gt;&lt;/span&gt;(page&lt;span style=&#34;color:#ff79c6&#34;&gt;-&amp;gt;&lt;/span&gt;GetData());
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;</description>
+        </item>
+        <item>
         <title>CMU 15-445 Project 1: Buffer Pool Manager</title>
         <link>https://ziannchen.work/2022/cmu-15-445-project-1-buffer-pool-manager/</link>
         <pubDate>Wed, 16 Feb 2022 23:15:13 +0800</pubDate>
